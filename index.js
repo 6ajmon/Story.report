@@ -26,6 +26,9 @@ const REPORT_OVERRIDES = {
   footerText: process.env.REPORT_FOOTER_TEXT || null,
   dateFrom: process.env.REPORT_DATE_FROM || null,
   dateTo: process.env.REPORT_DATE_TO || null,
+  mosaicArtistCount: parseInt(process.env.REPORT_MOSAIC_ARTIST_COUNT || '6', 10),
+  enableMosaic: process.env.REPORT_ENABLE_MOSAIC !== 'false',
+  textColorMode: process.env.REPORT_TEXT_COLOR_MODE || 'auto',
 };
 
 function ensureGeneratedDirectories() {
@@ -46,7 +49,7 @@ function loadCachedReport() {
 }
 
 /**
- * Fetch user info including total scrobbles
+ * Fetch user info including total scrobbles and avatar
  */
 async function fetchUserInfo() {
   // Validate environment variables only when hitting the API
@@ -72,6 +75,7 @@ async function fetchUserInfo() {
     }
 
     const user = response.data.user;
+
     return {
       username: user.name,
       totalScrobbles: parseInt(user.playcount) || 0,
@@ -92,10 +96,44 @@ function normalizeArray(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-function getPreviousMonthRange() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
-  const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+// Calculate luminance of a hex color (0-1, where 1 is brightest)
+function getColorLuminance(hexColor) {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16) / 255;
+  const g = parseInt(hex.substr(2, 2), 16) / 255;
+  const b = parseInt(hex.substr(4, 2), 16) / 255;
+
+  // Standard luminance formula
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+// Get appropriate text color based on background luminance
+function getTextColor(bgColor, textColorMode = 'auto') {
+  if (textColorMode === 'light') return 'ffffff';
+  if (textColorMode === 'dark') return '000000';
+  
+  // Auto mode: use luminance to decide
+  const luminance = getColorLuminance(bgColor);
+  return luminance > 0.5 ? '000000' : 'ffffff';
+}
+
+function getDateRange() {
+  // Check for custom date overrides
+  const customFrom = REPORT_OVERRIDES.dateFrom;
+  const customTo = REPORT_OVERRIDES.dateTo;
+
+  let start, end;
+
+  if (customFrom && customTo) {
+    // Parse ISO date format (YYYY-MM-DD) and create Date objects
+    start = new Date(`${customFrom}T00:00:00Z`);
+    end = new Date(`${customTo}T23:59:59Z`);
+  } else {
+    // Use previous calendar month (default behavior)
+    const now = new Date();
+    start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+    end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  }
 
   const formatter = new Intl.DateTimeFormat('en-GB', {
     day: '2-digit',
@@ -373,30 +411,45 @@ async function downloadImage(urls, baseFilename) {
 }
 
 /**
- * Format duration (minutes to days/hours)
+ * Format duration (minutes to days/hours with full words)
  */
 function formatDuration(minutes) {
   const days = Math.floor(minutes / (24 * 60));
   const hours = Math.floor((minutes % (24 * 60)) / 60);
   const mins = minutes % 60;
 
+  const parts = [];
   if (days > 0) {
-    return `${days} d, ${hours} h`;
+    parts.push(`${days} ${days === 1 ? 'day' : 'days'}`);
   }
   if (hours > 0) {
-    return `${hours} h, ${mins} min`;
+    parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
   }
-  return `${mins} min`;
+  if (mins > 0 && days === 0) {
+    parts.push(`${mins} ${mins === 1 ? 'minute' : 'minutes'}`);
+  }
+
+  return parts.join(', ') || '0 minutes';
 }
 
 /**
  * Generate a word-cloud using primaviz
  * Expects tagsWithCounts: Array<{ name: string, count: number }>
+ * accentColor: hex color string (e.g., '#e8d5a3')
+ * bgColor: hex background color string (e.g., '#0f0f0f')
  */
-function generateTagCloud(tagsWithCounts, maxTags = 20) {
+function generateTagCloud(tagsWithCounts, maxTags = 20, accentColor = '#e8d5a3', bgColor = '#0f0f0f') {
   if (!tagsWithCounts || tagsWithCounts.length === 0) {
     return '#text(size: 20pt)[No tags found]';
   }
+
+  // Calculate luminance to determine if background is light or dark
+  const bgHex = bgColor.replace('#', '');
+  const r = parseInt(bgHex.substr(0, 2), 16);
+  const g = parseInt(bgHex.substr(2, 2), 16);
+  const b = parseInt(bgHex.substr(4, 2), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const isDarkBg = luminance < 0.5;
 
   const topTags = tagsWithCounts.slice(0, maxTags);
 
@@ -404,25 +457,45 @@ function generateTagCloud(tagsWithCounts, maxTags = 20) {
     .map(({ name, count }) => `(text: "${name.replace(/"/g, '')}", weight: ${count})`)
     .join(',\n    ');
 
-  const generateGrayPalette = (count) => {
+  // Generate palette based on accent color with varying opacity/lightness
+  const generateAccentPalette = (count) => {
     const safeCount = Math.min(Math.max(count, 1), maxTags);
-    const start = 255; // ff
-    const end = 102;   // 66
+    const accentHex = accentColor.replace('#', '');
+    const accentR = parseInt(accentHex.substr(0, 2), 16);
+    const accentG = parseInt(accentHex.substr(2, 2), 16);
+    const accentB = parseInt(accentHex.substr(4, 2), 16);
+
+    // Get text color based on background brightness
+    const textColor = isDarkBg ? '#ffffff' : '#000000';
 
     if (safeCount === 1) {
-      return [`rgb("#ffffff")`];
+      return [{ accentColor, textColor }];
     }
 
     return Array.from({ length: safeCount }, (_, i) => {
       const t = i / (safeCount - 1);
-      const value = Math.round(start + (end - start) * t);
-      const hex = value.toString(16).padStart(2, '0');
-      const color = `#${hex}${hex}${hex}`;
-      return `rgb("${color}")`;
+      // Create variations of accent color by blending with black or white
+      const blendFactor = 0.3 + (0.7 * (1 - t)); // 30% to 100% of original color intensity
+      
+      const r = Math.round(accentR * blendFactor);
+      const g = Math.round(accentG * blendFactor);
+      const b = Math.round(accentB * blendFactor);
+      
+      const hex = [r, g, b]
+        .map(x => x.toString(16).padStart(2, '0'))
+        .join('');
+      
+      return { accentColor: `#${hex}`, textColor };
     });
   };
 
-  const paletteEntries = generateGrayPalette(topTags.length).join(',\n        ');
+  const paletteWithText = generateAccentPalette(topTags.length);
+  const paletteEntries = paletteWithText
+    .map(({ accentColor }) => `rgb("${accentColor}")`)
+    .join(',\n        ');
+  
+  // Use text color from first entry (all are same for light/dark bg)
+  const textColorForCloud = paletteWithText[0]?.textColor || '#ffffff';
 
   return `#word-cloud(
     (words: (
@@ -436,13 +509,66 @@ function generateTagCloud(tagsWithCounts, maxTags = 20) {
       palette: (
         ${paletteEntries}
       ),
+      text-color: rgb("${textColorForCloud}"),
     ),
   )`;
 }
 
 /**
- * Generate Typst template with advanced layout
+ * Generate mosaic layout for top artists
+ * Returns Typst grid code
  */
+function generateArtistMosaic(topArtistsImages, mosaicCount, colors) {
+  if (!topArtistsImages || topArtistsImages.length === 0) {
+    return '';
+  }
+
+  const artists = topArtistsImages.slice(0, mosaicCount);
+  if (artists.length === 0) {
+    return '';
+  }
+
+  // Determine grid layout
+  let cols, rows;
+  if (artists.length <= 4) {
+    cols = 2;
+    rows = 2;
+  } else if (artists.length === 5) {
+    cols = 3;
+    rows = 2;
+  } else {
+    cols = 3;
+    rows = 2;
+  }
+
+  const cellSize = '1fr';
+  const columnDef = Array(cols).fill(cellSize).join(', ');
+
+  let mosaicElements = '';
+  for (const artist of artists) {
+    if (artist.imagePath) {
+      mosaicElements += `
+  [#image("${artist.imagePath}", width: 100%)],`;
+    } else {
+      mosaicElements += `
+  [#box(width: 100%, height: 100%, fill: rgb("${colors.secondary}"), stroke: 1pt + rgb("${colors.secondary}"))],`;
+    }
+  }
+
+  // Add empty cells if needed to fill grid
+  const totalCells = cols * rows;
+  for (let i = artists.length; i < totalCells; i++) {
+    mosaicElements += `
+  [],`;
+  }
+
+  return `#grid(
+  columns: (${columnDef}),
+  column-gutter: 8pt,
+  row-gutter: 8pt,
+  ${mosaicElements}
+)`;
+}
 function generateTypstTemplate(data) {
   console.log('🎨 Generating Story.report Typst template...');
 
@@ -456,6 +582,7 @@ function generateTypstTemplate(data) {
     topAlbum,
     topTrack,
     topTags,
+    topArtistsImages,
     dateRange,
     artistImagePath,
     albumImagePath,
@@ -468,8 +595,20 @@ function generateTypstTemplate(data) {
   const listeningTime = formatDuration(Math.round(listeningMinutes));
 
   // Use config for margins, fonts, icons and colors
-  const { page, typography, icons, colors } = config;
+  const { page, typography, icons } = config;
+  let { colors } = config;
   const font = resolveTypstFontSpec(typography.font, typography.monoFont);
+
+  // Calculate adaptive text color based on background luminance
+  const bgColorHex = REPORT_OVERRIDES.bg || config.colors.background || '#0f0f0f';
+  const textColor = getTextColor(bgColorHex, REPORT_OVERRIDES.textColorMode);
+  colors = {
+    ...colors,
+    text: textColor,
+    textMuted: textColor,
+    background: bgColorHex,
+    secondary: REPORT_OVERRIDES.accent || config.colors.secondary || '#e8d5a3',
+  };
 
   // Build image elements - use relative paths directly
   let artistImageElement = '';
@@ -489,15 +628,25 @@ function generateTypstTemplate(data) {
 
   // avatar support removed
 
-  // Generate tag cloud (primaviz)
-  const tagCloud = generateTagCloud(topTags, 20);
+  // Generate tag cloud (primaviz) with accent color
+  const accentColorHex = REPORT_OVERRIDES.accent || config.colors.secondary || '#e8d5a3';
+  const tagCloud = generateTagCloud(topTags, 20, accentColorHex, bgColorHex);
 
-  // Sanitize footer text for interpolation into template
-  const footerTextSafe = (footerText && typeof footerText === 'string')
-    ? footerText.replace(/"/g, '\\"')
-    : null;
+  // Generate artist mosaic (only if enabled)
+  let artistMosaic = '';
+  if (REPORT_OVERRIDES.enableMosaic) {
+    const mosaicCount = REPORT_OVERRIDES.mosaicArtistCount || 6;
+    artistMosaic = generateArtistMosaic(topArtistsImages, mosaicCount, colors);
+  }
+
+  // Process footer text - preserve empty/null values
+  let footerTextSafe = null;
+  if (footerText && typeof footerText === 'string' && footerText.trim()) {
+    footerTextSafe = footerText.replace(/"/g, '\\"');
+  }
 
   const template = `#import "@preview/primaviz:0.6.0": word-cloud
+#import "@preview/fontawesome:0.6.0": *
 
 #set page(
   width: ${page.width},
@@ -513,23 +662,22 @@ function generateTypstTemplate(data) {
 #set text(font: ${font}, fill: rgb("${colors.text}"))
 
 // Header: Username and date range
-#text(size: 24pt, fill: rgb("${colors.textMuted}"))[
+#text(size: 32pt, fill: rgb("${colors.textMuted}"))[
   ${username}, ${dateRange}
 ]
 
-
-#v(30pt)
+#v(-30pt)
 
 // Main stat: Monthly scrobbles
-#text(size: 96pt, weight: "bold")[
+#text(size: 108pt, weight: "bold")[
   ${monthlyScrobbles} 
   #h(-20pt) 
-  #text(size: 36pt, weight: "regular", fill: rgb("${colors.textMuted}"))[scrobbles]
+  #text(size: 42pt, weight: "regular", fill: rgb("${colors.textMuted}"))[scrobbles]
 ]
 
-#v(-60pt)
+#v(-70pt)
 
-#text(size: 36pt, fill: rgb("${colors.secondary}"))[
+#text(size: 42pt, fill: rgb("${colors.secondary}"))[
   ${listeningTime}
 ]
 
@@ -541,21 +689,21 @@ function generateTypstTemplate(data) {
   align: (left + horizon, left + horizon, left + horizon),
 
   [
-    #text(size: 24pt, weight: "bold", fill: rgb("${colors.secondary}"))[${icons.artists}]
+    #text(size: 32pt, weight: "bold", fill: rgb("${colors.secondary}"))[#fa-star()]
     #v(0pt)
-    #text(size: 28pt, fill: rgb("${colors.secondary}"))[${uniqueArtists} artists]
+    #text(size: 32pt, fill: rgb("${colors.secondary}"))[${uniqueArtists} artists]
   ],
 
   [
-    #text(size: 24pt, weight: "bold", fill: rgb("${colors.secondary}"))[${icons.albums}]
+    #text(size: 32pt, weight: "bold", fill: rgb("${colors.secondary}"))[#fa-compact-disc()]
     #v(0pt)
-    #text(size: 28pt, fill: rgb("${colors.secondary}"))[${uniqueAlbums} albums]
+    #text(size: 32pt, fill: rgb("${colors.secondary}"))[${uniqueAlbums} albums]
   ],
 
   [
-    #text(size: 24pt, weight: "bold", fill: rgb("${colors.secondary}"))[${icons.tracks}]
+    #text(size: 32pt, weight: "bold", fill: rgb("${colors.secondary}"))[#fa-music()]
     #v(0pt)
-    #text(size: 28pt, fill: rgb("${colors.secondary}"))[${uniqueTracks} tracks]
+    #text(size: 32pt, fill: rgb("${colors.secondary}"))[${uniqueTracks} tracks]
   ],
 )
 
@@ -565,6 +713,13 @@ function generateTypstTemplate(data) {
 
 #v(50pt)
 
+// Top artists mosaic
+${artistMosaic ? `
+${artistMosaic}
+
+#v(16pt)
+` : ''}
+
 #grid(
   columns: (160pt, 1fr, 160pt),
   column-gutter: 24pt,
@@ -572,29 +727,29 @@ function generateTypstTemplate(data) {
   align: (left + horizon, left + horizon, center + horizon),
 
   // Top artist
-  text(size: 24pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top artist],
+  text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top artist],
   [
-    #text(size: 32pt, weight: "bold")[${topArtist.name}]
+    #text(size: 36pt, weight: "bold")[${topArtist.name}]
     #v(4pt)
-    #text(size: 22pt, fill: rgb("${colors.secondary}"))[${topArtist.playcount} scrobbles]
+    #text(size: 26pt, fill: rgb("${colors.secondary}"))[${topArtist.playcount} scrobbles]
   ],
   ${artistImageElement}
 
   // Top album
-  text(size: 24pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top album],
+  text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top album],
   [
-    #text(size: 32pt, weight: "bold")[${topAlbum.name}]
+    #text(size: 36pt, weight: "bold")[${topAlbum.name}]
     #v(4pt)
-    #text(size: 22pt, fill: rgb("${colors.secondary}"))[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
+    #text(size: 26pt, fill: rgb("${colors.secondary}"))[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
   ],
   ${albumImageElement}
 
   // Top track
-  text(size: 24pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top track],
+  text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top track],
   [
-    #text(size: 32pt, weight: "bold")[${topTrack.name}]
+    #text(size: 36pt, weight: "bold")[${topTrack.name}]
     #v(4pt)
-    #text(size: 22pt, fill: rgb("${colors.secondary}"))[${topTrack.artist} · ${topTrack.playcount} scrobbles]
+    #text(size: 26pt, fill: rgb("${colors.secondary}"))[${topTrack.artist} · ${topTrack.playcount} scrobbles]
   ],
   ${trackImageElement}
 )
@@ -602,7 +757,7 @@ function generateTypstTemplate(data) {
 #v(40pt)
 
 // Top tags
-#text(size: 24pt, weight: "bold", fill: rgb("${colors.textMuted}"))[
+#text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[
   Top tags
 ]
 
@@ -613,11 +768,11 @@ ${tagCloud}
 #v(1fr)
 
 // Footer
-#align(center)[
-  #text(size: 18pt, fill: rgb("${colors.textMuted}"))[ 
-    ${footerTextSafe ? footerTextSafe : 'Generated by Story.report'}
+${footerTextSafe ? `#align(center)[
+  #text(size: 20pt, fill: rgb("${colors.textMuted}"))[ 
+    ${footerTextSafe}
   ]
-]
+]` : ''}
 
 `;
 
@@ -642,8 +797,8 @@ async function compileTypstToPng(typstFilePath, outputImagePath) {
       process.exit(1);
     }
 
-    // Compile Typst to PNG
-    execSync(`typst compile "${typstFilePath}" "${outputImagePath}"`, {
+    // Compile Typst to PNG (export only page 1 for Instagram Story)
+    execSync(`typst compile --pages 1 "${typstFilePath}" "${outputImagePath}"`, {
       stdio: 'inherit',
     });
 
@@ -659,7 +814,7 @@ async function compileTypstToPng(typstFilePath, outputImagePath) {
  */
 async function fetchAndCacheReport() {
   const userInfo = await fetchUserInfo();
-  const monthRange = getPreviousMonthRange();
+  const monthRange = getDateRange();
   const recentTracks = await fetchRecentTracksInRange(monthRange.from, monthRange.to);
 
   if (!recentTracks.length) {
@@ -717,6 +872,32 @@ async function fetchAndCacheReport() {
     'track'
   );
 
+  // Fetch top artists images for mosaic
+  const topArtistsImages = [];
+  const topArtistsData = await Promise.all(
+    listeningData.topArtists.slice(0, 6).map((artist, index) =>
+      fetchEntityInfo('artist', artist)
+        .then(info => ({
+          artist,
+          info,
+          index,
+        }))
+        .catch(() => ({ artist, info: null, index }))
+    )
+  );
+
+  for (const { artist, info, index } of topArtistsData) {
+    const imagePath = await downloadImage(
+      extractImageUrls(info?.image),
+      `artist-mosaic-${index}`
+    );
+    topArtistsImages.push({
+      artist: artist.name,
+      playcount: artist.playcount,
+      imagePath,
+    });
+  }
+
   const jsonReport = {
     generatedAt: new Date().toISOString(),
     monthRange: monthRange,
@@ -724,6 +905,7 @@ async function fetchAndCacheReport() {
     recentTracks: recentTracks,
     listeningData: listeningData,
     topTags: topTags,
+    topArtistsImages: topArtistsImages,
     images: {
       artistImagePath: artistImagePath,
       albumImagePath: albumImagePath,
@@ -748,7 +930,7 @@ async function fetchAndCacheReport() {
  * Build template data from a cached (or freshly fetched) JSON report
  */
 function buildTemplateData(jsonReport) {
-  const { userInfo, listeningData, topTags, images, monthRange } = jsonReport;
+  const { userInfo, listeningData, topTags, topArtistsImages, images, monthRange } = jsonReport;
   const topArtist = listeningData.topArtists[0];
 
   return {
@@ -761,6 +943,7 @@ function buildTemplateData(jsonReport) {
     topAlbum: listeningData.topAlbum,
     topTrack: listeningData.topTrack,
     topTags: topTags,
+    topArtistsImages: topArtistsImages,
     dateRange: monthRange.label,
     artistImagePath: images.artistImagePath,
     albumImagePath: images.albumImagePath,

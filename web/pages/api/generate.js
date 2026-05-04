@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -7,11 +8,16 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { font, bg, accent, from, to, footer } = req.body || {};
+  const { font, bg, accent, from, to, footer, forceFetch, mosaicArtistCount, enableMosaic, textColorMode } = req.body || {};
 
   const cwd = path.resolve(process.cwd(), '..');
   const node = process.execPath;
   const script = path.join(cwd, 'index.js');
+  const reportJsonPath = path.join(cwd, 'generated', 'report.json');
+
+  // Determine if we should use --force flag
+  // Use --force if: forceFetch is true OR report.json doesn't exist OR date range overrides are provided
+  const shouldForce = forceFetch || !fs.existsSync(reportJsonPath) || from || to;
 
   const env = Object.assign({}, process.env);
   if (font) env.REPORT_FONT = font;
@@ -20,8 +26,16 @@ export default async function handler(req, res) {
   if (footer) env.REPORT_FOOTER_TEXT = footer;
   if (from) env.REPORT_DATE_FROM = from;
   if (to) env.REPORT_DATE_TO = to;
+  if (mosaicArtistCount) env.REPORT_MOSAIC_ARTIST_COUNT = String(mosaicArtistCount);
+  if (enableMosaic !== undefined) env.REPORT_ENABLE_MOSAIC = String(enableMosaic);
+  if (textColorMode) env.REPORT_TEXT_COLOR_MODE = textColorMode;
 
-  const child = spawn(node, [script, '--force'], { env, cwd: cwd });
+  const args = [script];
+  if (shouldForce) {
+    args.push('--force');
+  }
+
+  const child = spawn(node, args, { env, cwd: cwd });
 
   let stdout = '';
   let stderr = '';
@@ -36,3 +50,4 @@ export default async function handler(req, res) {
     }
   });
 }
+
