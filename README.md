@@ -1,4 +1,5 @@
 # Story.report
+<img height="600" alt="report" src="https://github.com/user-attachments/assets/2b8c4a02-f685-4cb4-a1b1-f221875311c0" />
 
 Instagram Story report generator (1080x1920) built from Last.fm listening data, with a Next.js web UI for configuring, customizing, and previewing reports in real-time.
 
