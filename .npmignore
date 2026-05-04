@@ -1,0 +1,39 @@
+# Generated files
+report.typ
+report.png
+report-example.typ
+report-example.png
+
+# Environment
+.env
+.env.local
+
+# Documentation (if publishing as npm package)
+# ARCHITECTURE.md
+# FAQ.md
+# QUICK_START.md
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing (if added later)
+coverage/
+.nyc_output
+test/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*

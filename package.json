@@ -1,0 +1,26 @@
+{
+  "name": "story-report",
+  "version": "1.0.0",
+  "description": "Story.report - generate Instagram Story with Last.fm monthly listening statistics",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "example": "node example.js"
+  },
+  "keywords": [
+    "last.fm",
+    "spotify wrapped",
+    "instagram story",
+    "typst",
+    "music statistics"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {}
+}

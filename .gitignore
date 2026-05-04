@@ -1,0 +1,37 @@
+# Environment variables
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# Generated runtime artifacts
+generated/
+report.typ
+report.png
+report-*.png
+artist.png
+artist.jpg
+album.png
+album.jpg
+track.png
+track.jpg
+
+# Logs and local debug output
+logs/
+*.log
+output.log
+last_run.log
+npm-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
