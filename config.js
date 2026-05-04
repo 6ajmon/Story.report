@@ -28,7 +28,7 @@ export const config = {
   // Typography
   typography: {
     font: 'Segoe UI',          // Change to 'Courier New', 'IBM Plex Mono', 'JetBrains Mono', etc. for monospace
-    monoFont: 'JetBrains Mono',   // Monospace alternative
+    monoFont: 'Consolas',   // Monospace alternative that is usually available on Windows
     title: {
       size: '48pt',
       weight: 'bold',
