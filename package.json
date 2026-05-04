@@ -8,6 +8,7 @@
     "start": "node index.js",
     "start force": "node index.js --force",
     "dev": "node index.js",
+    "ui": "node ui-server.js",
     "example": "node example.js"
   },
   "keywords": [

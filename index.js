@@ -18,6 +18,16 @@ const GENERATED_JSON_FILE = path.join(GENERATED_DIR, 'report.json');
 // CLI flags
 const FORCE_FETCH = process.argv.includes('--force');
 
+// Environment overrides (used by the UI server)
+const REPORT_OVERRIDES = {
+  font: process.env.REPORT_FONT || null,
+  bg: process.env.REPORT_BG || null,
+  accent: process.env.REPORT_ACCENT || null,
+  footerText: process.env.REPORT_FOOTER_TEXT || null,
+  dateFrom: process.env.REPORT_DATE_FROM || null,
+  dateTo: process.env.REPORT_DATE_TO || null,
+};
+
 function ensureGeneratedDirectories() {
   fs.mkdirSync(GENERATED_ASSETS_DIR, { recursive: true });
 }
@@ -418,8 +428,8 @@ function generateTypstTemplate(data) {
   const listeningMinutes = monthlyScrobbles * 3.5;
   const listeningTime = formatDuration(Math.round(listeningMinutes));
 
-  // Use config for margins, fonts, and icons
-  const { page, typography, icons } = config;
+  // Use config for margins, fonts, icons and colors
+  const { page, typography, icons, colors } = config;
   const font = typography.font;
 
   // Build image elements - use relative paths directly
@@ -438,6 +448,8 @@ function generateTypstTemplate(data) {
     trackImageElement = `image("${trackImagePath}", width: 144pt),`;
   }
 
+  // avatar support removed
+
   // Generate tag cloud (primaviz)
   const tagCloud = generateTagCloud(topTags, 20);
 
@@ -452,14 +464,15 @@ function generateTypstTemplate(data) {
     left: ${page.margin.left},
     right: ${page.margin.right},
   ),
-  fill: rgb("#0f0f0f"),
+  fill: rgb("${colors.background}"),
 )
-#set text(font: "${font}", fill: rgb("#ffffff"))
+#set text(font: "${font}", fill: rgb("${colors.text}"))
 
 // Header: Username and date range
-#text(size: 24pt, fill: rgb("#888888"))[
+#text(size: 24pt, fill: rgb("${colors.textMuted}"))[
   ${username}, ${dateRange}
 ]
+
 
 #v(30pt)
 
@@ -467,12 +480,12 @@ function generateTypstTemplate(data) {
 #text(size: 96pt, weight: "bold")[
   ${monthlyScrobbles} 
   #h(-20pt) 
-  #text(size: 36pt, weight: "regular", fill: rgb("#888888"))[scrobbles]
+  #text(size: 36pt, weight: "regular", fill: rgb("${colors.textMuted}"))[scrobbles]
 ]
 
 #v(-60pt)
 
-#text(size: 36pt, fill: rgb("#aaaaaa"))[
+#text(size: 36pt, fill: rgb("${colors.secondary}"))[
   ${listeningTime}
 ]
 
@@ -484,27 +497,27 @@ function generateTypstTemplate(data) {
   align: (left + horizon, left + horizon, left + horizon),
 
   [
-    #text(size: 24pt, weight: "bold", fill: rgb("#aaaaaa"))[${icons.artists}]
+    #text(size: 24pt, weight: "bold", fill: rgb("${colors.secondary}"))[${icons.artists}]
     #v(0pt)
-    #text(size: 28pt, fill: rgb("#aaaaaa"))[${uniqueArtists} artists]
+    #text(size: 28pt, fill: rgb("${colors.secondary}"))[${uniqueArtists} artists]
   ],
 
   [
-    #text(size: 24pt, weight: "bold", fill: rgb("#aaaaaa"))[${icons.albums}]
+    #text(size: 24pt, weight: "bold", fill: rgb("${colors.secondary}"))[${icons.albums}]
     #v(0pt)
-    #text(size: 28pt, fill: rgb("#aaaaaa"))[${uniqueAlbums} albums]
+    #text(size: 28pt, fill: rgb("${colors.secondary}"))[${uniqueAlbums} albums]
   ],
 
   [
-    #text(size: 24pt, weight: "bold", fill: rgb("#aaaaaa"))[${icons.tracks}]
+    #text(size: 24pt, weight: "bold", fill: rgb("${colors.secondary}"))[${icons.tracks}]
     #v(0pt)
-    #text(size: 28pt, fill: rgb("#aaaaaa"))[${uniqueTracks} tracks]
+    #text(size: 28pt, fill: rgb("${colors.secondary}"))[${uniqueTracks} tracks]
   ],
 )
 
 #v(40pt)
 
-#line(length: 100%, stroke: 1pt + rgb("#333333"))
+#line(length: 100%, stroke: 1pt + rgb("${colors.secondary}"))
 
 #v(50pt)
 
@@ -515,29 +528,29 @@ function generateTypstTemplate(data) {
   align: (left + horizon, left + horizon, center + horizon),
 
   // Top artist
-  text(size: 24pt, weight: "bold", fill: rgb("#888888"))[Top artist],
+  text(size: 24pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top artist],
   [
     #text(size: 32pt, weight: "bold")[${topArtist.name}]
     #v(4pt)
-    #text(size: 22pt, fill: rgb("#aaaaaa"))[${topArtist.playcount} scrobbles]
+    #text(size: 22pt, fill: rgb("${colors.secondary}"))[${topArtist.playcount} scrobbles]
   ],
   ${artistImageElement}
 
   // Top album
-  text(size: 24pt, weight: "bold", fill: rgb("#888888"))[Top album],
+  text(size: 24pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top album],
   [
     #text(size: 32pt, weight: "bold")[${topAlbum.name}]
     #v(4pt)
-    #text(size: 22pt, fill: rgb("#aaaaaa"))[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
+    #text(size: 22pt, fill: rgb("${colors.secondary}"))[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
   ],
   ${albumImageElement}
 
   // Top track
-  text(size: 24pt, weight: "bold", fill: rgb("#888888"))[Top track],
+  text(size: 24pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top track],
   [
     #text(size: 32pt, weight: "bold")[${topTrack.name}]
     #v(4pt)
-    #text(size: 22pt, fill: rgb("#aaaaaa"))[${topTrack.artist} · ${topTrack.playcount} scrobbles]
+    #text(size: 22pt, fill: rgb("${colors.secondary}"))[${topTrack.artist} · ${topTrack.playcount} scrobbles]
   ],
   ${trackImageElement}
 )
@@ -545,7 +558,7 @@ function generateTypstTemplate(data) {
 #v(40pt)
 
 // Top tags
-#text(size: 24pt, weight: "bold", fill: rgb("#888888"))[
+#text(size: 24pt, weight: "bold", fill: rgb("${colors.textMuted}"))[
   Top tags
 ]
 
@@ -557,7 +570,7 @@ ${tagCloud}
 
 // Footer
 #align(center)[
-  #text(size: 18pt, fill: rgb("#555555"))[
+  #text(size: 18pt, fill: rgb("${colors.textMuted}"))[
     Generated by Story.report
   ]
 ]`;
@@ -752,6 +765,14 @@ async function main() {
     console.log(`   Top Album: ${templateData.topAlbum.name} (${templateData.topAlbum.playcount})`);
     console.log(`   Top Track: ${templateData.topTrack.name} (${templateData.topTrack.playcount})`);
     console.log(`   Top Tags: ${templateData.topTags.map((t) => t.name).join(', ')}\n`);
+
+    // Apply environment overrides (from UI) into config
+    if (REPORT_OVERRIDES.font) config.typography.font = REPORT_OVERRIDES.font;
+    if (REPORT_OVERRIDES.bg) config.colors.background = REPORT_OVERRIDES.bg;
+    if (REPORT_OVERRIDES.accent) config.colors.primary = REPORT_OVERRIDES.accent;
+    if (REPORT_OVERRIDES.footerText) {
+      // The template currently uses a static footer; we could inject overrides by post-processing the template string if needed.
+    }
 
     // Generate Typst template
     const typstTemplate = generateTypstTemplate(templateData);
