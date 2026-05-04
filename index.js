@@ -352,24 +352,44 @@ function generateTagCloud(tagsWithCounts, maxTags = 20) {
 
   const topTags = tagsWithCounts.slice(0, maxTags);
 
-  // primaviz word-cloud expects: data: (words: ((text: "...", weight: N), ...))
   const wordEntries = topTags
     .map(({ name, count }) => `(text: "${name.replace(/"/g, '')}", weight: ${count})`)
     .join(',\n    ');
 
+  const generateGrayPalette = (count) => {
+    const safeCount = Math.min(Math.max(count, 1), maxTags);
+    const start = 255; // ff
+    const end = 102;   // 66
+
+    if (safeCount === 1) {
+      return [`rgb("#ffffff")`];
+    }
+
+    return Array.from({ length: safeCount }, (_, i) => {
+      const t = i / (safeCount - 1);
+      const value = Math.round(start + (end - start) * t);
+      const hex = value.toString(16).padStart(2, '0');
+      const color = `#${hex}${hex}${hex}`;
+      return `rgb("${color}")`;
+    });
+  };
+
+  const paletteEntries = generateGrayPalette(topTags.length).join(',\n        ');
+
   return `#word-cloud(
-  (words: (\n    ${wordEntries}\n  )),
-  min-size: 14pt,
-  max-size: 36pt,
-  theme: (
-    colors: (
-      rgb("#ffffff"),
-      rgb("#aaaaaa"),
-      rgb("#888888"),
-      rgb("#666666"),
+    (words: (
+      ${wordEntries}
+    )),
+    height: auto,
+    width: 100%,
+    min-size: 24pt,
+    max-size: 72pt,
+    theme: (
+      palette: (
+        ${paletteEntries}
+      ),
     ),
-  ),
-)`;
+  )`;
 }
 
 /**
