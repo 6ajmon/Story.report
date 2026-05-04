@@ -87,9 +87,9 @@ function getPreviousMonthRange() {
   const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
   const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
+  const formatter = new Intl.DateTimeFormat('en-GB', {
     day: '2-digit',
+    month: 'short',
     year: 'numeric',
   });
 
@@ -425,17 +425,17 @@ function generateTypstTemplate(data) {
   // Build image elements - use relative paths directly
   let artistImageElement = '';
   if (artistImagePath) {
-    artistImageElement = `image("${artistImagePath}", width: 120pt),`;
+    artistImageElement = `image("${artistImagePath}", width: 144pt),`;
   }
 
   let albumImageElement = '';
   if (albumImagePath) {
-    albumImageElement = `image("${albumImagePath}", width: 120pt),`;
+    albumImageElement = `image("${albumImagePath}", width: 144pt),`;
   }
 
   let trackImageElement = '';
   if (trackImagePath) {
-    trackImageElement = `image("${trackImagePath}", width: 120pt),`;
+    trackImageElement = `image("${trackImagePath}", width: 144pt),`;
   }
 
   // Generate tag cloud (primaviz)
@@ -457,26 +457,26 @@ function generateTypstTemplate(data) {
 #set text(font: "${font}", fill: rgb("#ffffff"))
 
 // Header: Username and date range
-#text(size: 20pt, fill: rgb("#888888"))[
+#text(size: 24pt, fill: rgb("#888888"))[
   ${username}, ${dateRange}
 ]
 
 #v(30pt)
 
 // Main stat: Monthly scrobbles
-#text(size: 84pt, weight: "bold")[
+#text(size: 96pt, weight: "bold")[
   ${monthlyScrobbles} 
   #h(-20pt) 
-  #text(size: 24pt, weight: "regular", fill: rgb("#888888"))[scrobbles]
+  #text(size: 36pt, weight: "regular", fill: rgb("#888888"))[scrobbles]
 ]
 
 #v(-60pt)
 
-#text(size: 22pt, fill: rgb("#aaaaaa"))[
+#text(size: 36pt, fill: rgb("#aaaaaa"))[
   ${listeningTime}
 ]
 
-#v(50pt)
+#v(20pt)
 
 #grid(
   columns: (1fr, 1fr, 1fr),
@@ -486,19 +486,19 @@ function generateTypstTemplate(data) {
   [
     #text(size: 24pt, weight: "bold", fill: rgb("#aaaaaa"))[${icons.artists}]
     #v(0pt)
-    #text(size: 18pt, fill: rgb("#aaaaaa"))[${uniqueArtists} artists]
+    #text(size: 28pt, fill: rgb("#aaaaaa"))[${uniqueArtists} artists]
   ],
 
   [
     #text(size: 24pt, weight: "bold", fill: rgb("#aaaaaa"))[${icons.albums}]
     #v(0pt)
-    #text(size: 18pt, fill: rgb("#aaaaaa"))[${uniqueAlbums} albums]
+    #text(size: 28pt, fill: rgb("#aaaaaa"))[${uniqueAlbums} albums]
   ],
 
   [
     #text(size: 24pt, weight: "bold", fill: rgb("#aaaaaa"))[${icons.tracks}]
     #v(0pt)
-    #text(size: 18pt, fill: rgb("#aaaaaa"))[${uniqueTracks} tracks]
+    #text(size: 28pt, fill: rgb("#aaaaaa"))[${uniqueTracks} tracks]
   ],
 )
 
@@ -509,7 +509,7 @@ function generateTypstTemplate(data) {
 #v(50pt)
 
 #grid(
-  columns: (150pt, 1fr, 120pt),
+  columns: (160pt, 1fr, 160pt),
   column-gutter: 24pt,
   row-gutter: 28pt,
   align: (left + horizon, left + horizon, center + horizon),
@@ -517,27 +517,27 @@ function generateTypstTemplate(data) {
   // Top artist
   text(size: 24pt, weight: "bold", fill: rgb("#888888"))[Top artist],
   [
-    #text(size: 28pt, weight: "bold")[${topArtist.name}]
+    #text(size: 32pt, weight: "bold")[${topArtist.name}]
     #v(4pt)
-    #text(size: 18pt, fill: rgb("#aaaaaa"))[${topArtist.playcount} scrobbles]
+    #text(size: 22pt, fill: rgb("#aaaaaa"))[${topArtist.playcount} scrobbles]
   ],
   ${artistImageElement}
 
   // Top album
   text(size: 24pt, weight: "bold", fill: rgb("#888888"))[Top album],
   [
-    #text(size: 28pt, weight: "bold")[${topAlbum.name}]
+    #text(size: 32pt, weight: "bold")[${topAlbum.name}]
     #v(4pt)
-    #text(size: 18pt, fill: rgb("#aaaaaa"))[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
+    #text(size: 22pt, fill: rgb("#aaaaaa"))[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
   ],
   ${albumImageElement}
 
   // Top track
   text(size: 24pt, weight: "bold", fill: rgb("#888888"))[Top track],
   [
-    #text(size: 28pt, weight: "bold")[${topTrack.name}]
+    #text(size: 32pt, weight: "bold")[${topTrack.name}]
     #v(4pt)
-    #text(size: 18pt, fill: rgb("#aaaaaa"))[${topTrack.artist} · ${topTrack.playcount} scrobbles]
+    #text(size: 22pt, fill: rgb("#aaaaaa"))[${topTrack.artist} · ${topTrack.playcount} scrobbles]
   ],
   ${trackImageElement}
 )
@@ -545,11 +545,11 @@ function generateTypstTemplate(data) {
 #v(40pt)
 
 // Top tags
-#text(size: 20pt, weight: "bold", fill: rgb("#888888"))[
+#text(size: 24pt, weight: "bold", fill: rgb("#888888"))[
   Top tags
 ]
 
-#v(8pt)
+#v(0pt)
 
 ${tagCloud}
 
