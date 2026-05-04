@@ -8,7 +8,12 @@ export const config = {
   page: {
     width: '1080pt',
     height: '1920pt',
-    margin: '0pt',
+    margin: {
+      top: '60pt',
+      bottom: '60pt',
+      left: '48pt',
+      right: '48pt',
+    },
   },
 
   // Colors
@@ -22,7 +27,8 @@ export const config = {
 
   // Typography
   typography: {
-    font: 'Inter',
+    font: 'Segoe UI',          // Change to 'Courier New', 'IBM Plex Mono', 'JetBrains Mono', etc. for monospace
+    monoFont: 'JetBrains Mono',   // Monospace alternative
     title: {
       size: '48pt',
       weight: 'bold',
@@ -68,11 +74,18 @@ export const config = {
     imageFile: 'report.png',
   },
 
-  // Emojis
+  // Emojis and Icons
   emojis: {
     title: '🎵',
     artists: '🎤',
     tracks: '🎶',
+  },
+
+  // Statistics icons (Unicode symbols - minimalist monochromatic)
+  icons: {
+    artists: '★',      // U+2605 BLACK STAR
+    albums: '◉',       // U+25C9 FISHEYE (vinyl-like circle)
+    tracks: '♪',       // U+266A EIGHTH NOTE
   },
 };
 

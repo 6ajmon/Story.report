@@ -28,11 +28,25 @@ Last.fm often does not return a complete image field for every entity. The proje
 ### Where is the report?
 In generated/report.png.
 
+### Where is the API JSON snapshot?
+In generated/report.json.
+
 ### Where is the Typst source?
 In generated/report.typ.
 
 ### Where are the downloaded images?
 In generated/assets.
+
+## Customization
+
+### How do I change the font to monospace?
+Edit `config.js`, change `typography.font` to:
+```javascript
+font: 'Courier New', // or 'IBM Plex Mono', 'JetBrains Mono', etc.
+```
+
+### What are the tag cloud sizes?
+Tags are displayed in a flowing word cloud. Font size scales from **14pt** (smallest count) to **32pt** (largest count). Tags are shuffled for organic appearance and use varying gray shades (darker = less popular, whiter = more popular).
 
 ## Running the app
 

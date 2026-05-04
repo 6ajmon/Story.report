@@ -72,16 +72,65 @@ Note: the generated directory is ignored by git.
 ## Output
 
 - final image: generated/report.png
+- API snapshot: generated/report.json
 - Typst source: generated/report.typ
 - downloaded helper images: generated/assets
+
+## Customizing the report
+
+### Change font
+Edit [config.js](config.js) to change the `typography.font` value:
+
+```javascript
+typography: {
+  font: 'Segoe UI',       // Change to 'Courier New', 'IBM Plex Mono', 'JetBrains Mono' for monospace
+  monoFont: 'Courier New', // Fallback monospace font
+  ...
+}
+```
+
+Common monospace fonts:
+- `Courier New` (default, works everywhere)
+- `IBM Plex Mono`
+- `JetBrains Mono`
+- `Inconsolata`
+
+### Adjust layout (margins, spacing)
+Edit [config.js](config.js) page margins and spacing properties:
+
+```javascript
+page: {
+  margin: {
+    top: '60pt',
+    bottom: '60pt',
+    left: '48pt',
+    right: '48pt',
+  },
+}
+```
+
+### Change statistics icons
+Edit [config.js](config.js) icons section to customize the minimalist Unicode symbols:
+
+```javascript
+icons: {
+  artists: '★',       // BLACK STAR - change to ◆, ◈, etc.
+  albums: '◉',        // FISHEYE (vinyl-like) - change to ◯, ◎, etc.
+  tracks: '♪',        // EIGHTH NOTE - change to ♫, 🎵, etc.
+}
+```
+
+### Modify colors
+Edit [config.js](config.js) colors section, or directly in generateTypstTemplate function in [index.js](index.js).
 
 ## Extending the project
 
 The main extension points are:
 
 - data aggregation: aggregateListeningData in index.js
+- layout and typography: generateTypstTemplate and generateTagCloud in index.js
 - image fallbacks: extractImageUrls, extractTrackImageUrls, downloadImage in index.js
-- report appearance: generateTypstTemplate in index.js
+- tag cloud styling: generateTagCloud function in index.js (controls min/max font size: 14pt–28pt)
 
 ## Troubleshooting
 

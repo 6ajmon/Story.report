@@ -3,6 +3,7 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
+import { config } from './config.js';
 
 // Load environment variables
 dotenv.config();
@@ -12,22 +13,39 @@ const USERNAME = process.env.LASTFM_USERNAME;
 const API_BASE_URL = 'https://ws.audioscrobbler.com/2.0';
 const GENERATED_DIR = path.join(process.cwd(), 'generated');
 const GENERATED_ASSETS_DIR = path.join(GENERATED_DIR, 'assets');
+const GENERATED_JSON_FILE = path.join(GENERATED_DIR, 'report.json');
 
-// Validate environment variables
-if (!API_KEY || !USERNAME) {
-  console.error('❌ Error: Missing environment variables.');
-  console.error('Please set LASTFM_API_KEY and LASTFM_USERNAME in .env file');
-  process.exit(1);
-}
+// CLI flags
+const FORCE_FETCH = process.argv.includes('--force');
 
 function ensureGeneratedDirectories() {
   fs.mkdirSync(GENERATED_ASSETS_DIR, { recursive: true });
+}
+
+function writeJsonReport(filePath, data) {
+  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
+}
+
+function loadCachedReport() {
+  if (fs.existsSync(GENERATED_JSON_FILE)) {
+    console.log(`📂 Loading cached report from ${GENERATED_JSON_FILE}...`);
+    const raw = fs.readFileSync(GENERATED_JSON_FILE, 'utf-8');
+    return JSON.parse(raw);
+  }
+  return null;
 }
 
 /**
  * Fetch user info including total scrobbles
  */
 async function fetchUserInfo() {
+  // Validate environment variables only when hitting the API
+  if (!API_KEY || !USERNAME) {
+    console.error('❌ Error: Missing environment variables.');
+    console.error('Please set LASTFM_API_KEY and LASTFM_USERNAME in .env file');
+    process.exit(1);
+  }
+
   try {
     console.log('📊 Fetching user info...');
     const response = await axios.get(API_BASE_URL, {
@@ -238,12 +256,12 @@ async function fetchEntityInfo(entityType, entityData) {
   return response.data[entityType] || null;
 }
 
-async function fetchTopTagsFromArtists(artists, limit = 5) {
+async function fetchTopTagsFromArtists(artists, limit = 50) {
   try {
     const tagCounts = new Map();
 
     const responses = await Promise.all(
-      artists.slice(0, 5).map(async (artist) => {
+      artists.slice(0, 50).map(async (artist) => {
         const response = await axios.get(API_BASE_URL, {
           params: {
             method: 'artist.getTopTags',
@@ -259,7 +277,7 @@ async function fetchTopTagsFromArtists(artists, limit = 5) {
 
     for (const { artist, data } of responses) {
       const tags = normalizeArray(data?.toptags?.tag);
-      for (const tag of tags.slice(0, 5)) {
+      for (const tag of tags.slice(0, 50)) {
         const tagName = tag?.name;
         if (!tagName) {
           continue;
@@ -272,7 +290,7 @@ async function fetchTopTagsFromArtists(artists, limit = 5) {
     return [...tagCounts.entries()]
       .sort((left, right) => right[1] - left[1])
       .slice(0, limit)
-      .map(([tag]) => tag);
+      .map(([tag, count]) => ({ name: tag, count }));
   } catch (error) {
     console.warn(`⚠️  Could not derive fallback tags: ${error.message}`);
     return [];
@@ -324,6 +342,37 @@ function formatDuration(minutes) {
 }
 
 /**
+ * Generate a word-cloud using primaviz
+ * Expects tagsWithCounts: Array<{ name: string, count: number }>
+ */
+function generateTagCloud(tagsWithCounts, maxTags = 20) {
+  if (!tagsWithCounts || tagsWithCounts.length === 0) {
+    return '#text(size: 20pt)[No tags found]';
+  }
+
+  const topTags = tagsWithCounts.slice(0, maxTags);
+
+  // primaviz word-cloud expects: data: (words: ((text: "...", weight: N), ...))
+  const wordEntries = topTags
+    .map(({ name, count }) => `(text: "${name.replace(/"/g, '')}", weight: ${count})`)
+    .join(',\n    ');
+
+  return `#word-cloud(
+  (words: (\n    ${wordEntries}\n  )),
+  min-size: 14pt,
+  max-size: 36pt,
+  theme: (
+    colors: (
+      rgb("#ffffff"),
+      rgb("#aaaaaa"),
+      rgb("#888888"),
+      rgb("#666666"),
+    ),
+  ),
+)`;
+}
+
+/**
  * Generate Typst template with advanced layout
  */
 function generateTypstTemplate(data) {
@@ -349,27 +398,43 @@ function generateTypstTemplate(data) {
   const listeningMinutes = monthlyScrobbles * 3.5;
   const listeningTime = formatDuration(Math.round(listeningMinutes));
 
-  // Format top tags
-  const tagsText = topTags.length > 0 ? topTags.slice(0, 5).join(', ') : 'No tags found';
+  // Use config for margins, fonts, and icons
+  const { page, typography, icons } = config;
+  const font = typography.font;
 
   // Build image elements - use relative paths directly
   let artistImageElement = '';
   if (artistImagePath) {
-    artistImageElement = `#image("${artistImagePath}", width: 120pt)\n\n`;
+    artistImageElement = `image("${artistImagePath}", width: 120pt),`;
   }
 
   let albumImageElement = '';
   if (albumImagePath) {
-    albumImageElement = `#image("${albumImagePath}", width: 120pt)\n\n`;
+    albumImageElement = `image("${albumImagePath}", width: 120pt),`;
   }
 
   let trackImageElement = '';
   if (trackImagePath) {
-    trackImageElement = `#image("${trackImagePath}", width: 120pt)\n\n`;
+    trackImageElement = `image("${trackImagePath}", width: 120pt),`;
   }
 
-  const template = `#set page(width: 1080pt, height: 1920pt, margin: 0pt, fill: rgb("#0f0f0f"))
-#set text(font: "Segoe UI", fill: rgb("#ffffff"))
+  // Generate tag cloud (primaviz)
+  const tagCloud = generateTagCloud(topTags, 20);
+
+  const template = `#import "@preview/primaviz:0.6.0": word-cloud
+
+#set page(
+  width: ${page.width},
+  height: ${page.height},
+  margin: (
+    top: ${page.margin.top},
+    bottom: ${page.margin.bottom},
+    left: ${page.margin.left},
+    right: ${page.margin.right},
+  ),
+  fill: rgb("#0f0f0f"),
+)
+#set text(font: "${font}", fill: rgb("#ffffff"))
 
 // Header: Username and date range
 #text(size: 20pt, fill: rgb("#888888"))[
@@ -380,16 +445,12 @@ function generateTypstTemplate(data) {
 
 // Main stat: Monthly scrobbles
 #text(size: 84pt, weight: "bold")[
-  ${monthlyScrobbles}
+  ${monthlyScrobbles} 
+  #h(-20pt) 
+  #text(size: 24pt, weight: "regular", fill: rgb("#888888"))[scrobbles]
 ]
 
-#v(-20pt)
-
-#text(size: 24pt, fill: rgb("#888888"))[
-  scrobbles
-]
-
-#v(10pt)
+#v(-60pt)
 
 #text(size: 22pt, fill: rgb("#aaaaaa"))[
   ${listeningTime}
@@ -397,71 +458,69 @@ function generateTypstTemplate(data) {
 
 #v(50pt)
 
-// Three statistics
-#text(size: 18pt, fill: rgb("#aaaaaa"))[
-  ${uniqueArtists} artists · ${uniqueAlbums} albums · ${uniqueTracks} tracks
-]
+#grid(
+  columns: (1fr, 1fr, 1fr),
+  column-gutter: 24pt,
+  align: (left + horizon, left + horizon, left + horizon),
 
-#v(60pt)
+  [
+    #text(size: 24pt, weight: "bold", fill: rgb("#aaaaaa"))[${icons.artists}]
+    #v(0pt)
+    #text(size: 18pt, fill: rgb("#aaaaaa"))[${uniqueArtists} artists]
+  ],
+
+  [
+    #text(size: 24pt, weight: "bold", fill: rgb("#aaaaaa"))[${icons.albums}]
+    #v(0pt)
+    #text(size: 18pt, fill: rgb("#aaaaaa"))[${uniqueAlbums} albums]
+  ],
+
+  [
+    #text(size: 24pt, weight: "bold", fill: rgb("#aaaaaa"))[${icons.tracks}]
+    #v(0pt)
+    #text(size: 18pt, fill: rgb("#aaaaaa"))[${uniqueTracks} tracks]
+  ],
+)
+
+#v(40pt)
 
 #line(length: 100%, stroke: 1pt + rgb("#333333"))
 
 #v(50pt)
 
-// Top artist
-#text(size: 20pt, weight: "bold", fill: rgb("#888888"))[
-  Top artist
-]
+#grid(
+  columns: (150pt, 1fr, 120pt),
+  column-gutter: 24pt,
+  row-gutter: 28pt,
+  align: (left + horizon, left + horizon, center + horizon),
 
-#v(8pt)
+  // Top artist
+  text(size: 24pt, weight: "bold", fill: rgb("#888888"))[Top artist],
+  [
+    #text(size: 28pt, weight: "bold")[${topArtist.name}]
+    #v(4pt)
+    #text(size: 18pt, fill: rgb("#aaaaaa"))[${topArtist.playcount} scrobbles]
+  ],
+  ${artistImageElement}
 
-${artistImageElement}#text(size: 32pt, weight: "bold")[
-  ${topArtist.name}
-]
+  // Top album
+  text(size: 24pt, weight: "bold", fill: rgb("#888888"))[Top album],
+  [
+    #text(size: 28pt, weight: "bold")[${topAlbum.name}]
+    #v(4pt)
+    #text(size: 18pt, fill: rgb("#aaaaaa"))[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
+  ],
+  ${albumImageElement}
 
-#v(4pt)
-
-#text(size: 18pt, fill: rgb("#aaaaaa"))[
-  ${topArtist.playcount} scrobbles
-]
-
-#v(40pt)
-
-// Top album
-#text(size: 20pt, weight: "bold", fill: rgb("#888888"))[
-  Top album
-]
-
-#v(8pt)
-
-${albumImageElement}#text(size: 32pt, weight: "bold")[
-  ${topAlbum.name}
-]
-
-#v(4pt)
-
-#text(size: 18pt, fill: rgb("#aaaaaa"))[
-  ${topAlbum.artist} · ${topAlbum.playcount} scrobbles
-]
-
-#v(40pt)
-
-// Top track
-#text(size: 20pt, weight: "bold", fill: rgb("#888888"))[
-  Top track
-]
-
-#v(8pt)
-
-${trackImageElement}#text(size: 32pt, weight: "bold")[
-  ${topTrack.name}
-]
-
-#v(4pt)
-
-#text(size: 18pt, fill: rgb("#aaaaaa"))[
-  ${topTrack.artist} · ${topTrack.playcount} scrobbles
-]
+  // Top track
+  text(size: 24pt, weight: "bold", fill: rgb("#888888"))[Top track],
+  [
+    #text(size: 28pt, weight: "bold")[${topTrack.name}]
+    #v(4pt)
+    #text(size: 18pt, fill: rgb("#aaaaaa"))[${topTrack.artist} · ${topTrack.playcount} scrobbles]
+  ],
+  ${trackImageElement}
+)
 
 #v(40pt)
 
@@ -472,9 +531,7 @@ ${trackImageElement}#text(size: 32pt, weight: "bold")[
 
 #v(8pt)
 
-#text(size: 20pt)[
-  ${tagsText}
-]
+${tagCloud}
 
 #v(1fr)
 
@@ -519,6 +576,120 @@ async function compileTypstToPng(typstFilePath, outputImagePath) {
 }
 
 /**
+ * Fetch all data from Last.fm API and save to JSON cache
+ */
+async function fetchAndCacheReport() {
+  const userInfo = await fetchUserInfo();
+  const monthRange = getPreviousMonthRange();
+  const recentTracks = await fetchRecentTracksInRange(monthRange.from, monthRange.to);
+
+  if (!recentTracks.length) {
+    throw new Error('No scrobbles found for the previous month');
+  }
+
+  const listeningData = aggregateListeningData(recentTracks);
+  const topArtist = listeningData.topArtists[0];
+
+  if (!topArtist || !listeningData.topAlbum || !listeningData.topTrack) {
+    throw new Error('No top listening data available for the previous month');
+  }
+
+  const topTags = await fetchTopTagsFromArtists(listeningData.topArtists, 50);
+
+  console.log('🖼️  Downloading images...');
+  const [artistInfo, albumInfo, trackInfo, topTrackArtistInfo, topTrackAlbumInfo] = await Promise.all([
+    fetchEntityInfo('artist', topArtist).catch(() => null),
+    fetchEntityInfo('album', listeningData.topAlbum).catch(() => null),
+    fetchEntityInfo('track', listeningData.topTrack).catch(() => null),
+    fetchEntityInfo('artist', { name: listeningData.topTrack.artist }).catch(() => null),
+    listeningData.topTrackAlbumName
+      ? fetchEntityInfo('album', {
+          artist: listeningData.topTrack.artist,
+          name: listeningData.topTrackAlbumName,
+        }).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+
+  const artistImagePath = await downloadImage(
+    [
+      ...extractImageUrls(artistInfo?.image),
+      ...extractImageUrls(albumInfo?.image),
+      ...extractImageUrls(trackInfo?.image),
+    ],
+    'artist'
+  );
+
+  const albumImagePath = await downloadImage(
+    [
+      ...extractImageUrls(albumInfo?.image),
+      ...extractImageUrls(artistInfo?.image),
+      ...extractImageUrls(trackInfo?.image),
+    ],
+    'album'
+  );
+
+  const trackImagePath = await downloadImage(
+    [
+      ...extractTrackImageUrls(trackInfo),
+      ...extractImageUrls(topTrackAlbumInfo?.image),
+      ...extractImageUrls(topTrackArtistInfo?.image),
+      ...extractImageUrls(artistInfo?.image),
+    ],
+    'track'
+  );
+
+  const jsonReport = {
+    generatedAt: new Date().toISOString(),
+    monthRange: monthRange,
+    userInfo: userInfo,
+    recentTracks: recentTracks,
+    listeningData: listeningData,
+    topTags: topTags,
+    images: {
+      artistImagePath: artistImagePath,
+      albumImagePath: albumImagePath,
+      trackImagePath: trackImagePath,
+    },
+    apiPayload: {
+      artistInfo: artistInfo,
+      albumInfo: albumInfo,
+      trackInfo: trackInfo,
+      topTrackArtistInfo: topTrackArtistInfo,
+      topTrackAlbumInfo: topTrackAlbumInfo,
+    },
+  };
+
+  writeJsonReport(GENERATED_JSON_FILE, jsonReport);
+  console.log(`✅ JSON report saved: ${GENERATED_JSON_FILE}`);
+
+  return jsonReport;
+}
+
+/**
+ * Build template data from a cached (or freshly fetched) JSON report
+ */
+function buildTemplateData(jsonReport) {
+  const { userInfo, listeningData, topTags, images, monthRange } = jsonReport;
+  const topArtist = listeningData.topArtists[0];
+
+  return {
+    username: userInfo.username,
+    monthlyScrobbles: listeningData.monthlyScrobbles,
+    uniqueTracks: listeningData.uniqueTracks,
+    uniqueArtists: listeningData.uniqueArtists,
+    uniqueAlbums: listeningData.uniqueAlbums,
+    topArtist: topArtist,
+    topAlbum: listeningData.topAlbum,
+    topTrack: listeningData.topTrack,
+    topTags: topTags,
+    dateRange: monthRange.label,
+    artistImagePath: images.artistImagePath,
+    albumImagePath: images.albumImagePath,
+    trackImagePath: images.trackImagePath,
+  };
+}
+
+/**
  * Main function
  */
 async function main() {
@@ -526,81 +697,30 @@ async function main() {
     console.log('\n🚀 Starting Story.report Generator...\n');
     ensureGeneratedDirectories();
 
-    const userInfo = await fetchUserInfo();
-    const monthRange = getPreviousMonthRange();
-    const recentTracks = await fetchRecentTracksInRange(monthRange.from, monthRange.to);
+    let jsonReport;
 
-    if (!recentTracks.length) {
-      throw new Error('No scrobbles found for the previous month');
+    if (FORCE_FETCH) {
+      console.log('⚡ --force flag detected: fetching fresh data from Last.fm API...\n');
+      jsonReport = await fetchAndCacheReport();
+    } else {
+      const cached = loadCachedReport();
+      if (cached) {
+        jsonReport = cached;
+        console.log('✅ Using cached report.json — skipping API calls.\n');
+        console.log('   (Run with --force to fetch fresh data from Last.fm)\n');
+      } else {
+        console.log('ℹ️  No cached report found — fetching from Last.fm API...\n');
+        // Validate env vars now since we need to hit the API
+        if (!API_KEY || !USERNAME) {
+          console.error('❌ Error: Missing environment variables.');
+          console.error('Please set LASTFM_API_KEY and LASTFM_USERNAME in .env file');
+          process.exit(1);
+        }
+        jsonReport = await fetchAndCacheReport();
+      }
     }
 
-    const listeningData = aggregateListeningData(recentTracks);
-    const topArtist = listeningData.topArtists[0];
-
-    if (!topArtist || !listeningData.topAlbum || !listeningData.topTrack) {
-      throw new Error('No top listening data available for the previous month');
-    }
-
-    const topTags = await fetchTopTagsFromArtists(listeningData.topArtists, 5);
-
-    console.log('🖼️  Downloading images...');
-    const [artistInfo, albumInfo, trackInfo, topTrackArtistInfo, topTrackAlbumInfo] = await Promise.all([
-      fetchEntityInfo('artist', topArtist).catch(() => null),
-      fetchEntityInfo('album', listeningData.topAlbum).catch(() => null),
-      fetchEntityInfo('track', listeningData.topTrack).catch(() => null),
-      fetchEntityInfo('artist', { name: listeningData.topTrack.artist }).catch(() => null),
-      listeningData.topTrackAlbumName
-        ? fetchEntityInfo('album', {
-            artist: listeningData.topTrack.artist,
-            name: listeningData.topTrackAlbumName,
-          }).catch(() => null)
-        : Promise.resolve(null),
-    ]);
-
-    const artistImagePath = await downloadImage(
-      [
-        ...extractImageUrls(artistInfo?.image),
-        ...extractImageUrls(albumInfo?.image),
-        ...extractImageUrls(trackInfo?.image),
-      ],
-      'artist'
-    );
-
-    const albumImagePath = await downloadImage(
-      [
-        ...extractImageUrls(albumInfo?.image),
-        ...extractImageUrls(artistInfo?.image),
-        ...extractImageUrls(trackInfo?.image),
-      ],
-      'album'
-    );
-
-    const trackImagePath = await downloadImage(
-      [
-        ...extractTrackImageUrls(trackInfo),
-        ...extractImageUrls(topTrackAlbumInfo?.image),
-        ...extractImageUrls(topTrackArtistInfo?.image),
-        ...extractImageUrls(artistInfo?.image),
-      ],
-      'track'
-    );
-
-    // Prepare template data
-    const templateData = {
-      username: userInfo.username,
-      monthlyScrobbles: listeningData.monthlyScrobbles,
-      uniqueTracks: listeningData.uniqueTracks,
-      uniqueArtists: listeningData.uniqueArtists,
-      uniqueAlbums: listeningData.uniqueAlbums,
-      topArtist: topArtist,
-      topAlbum: listeningData.topAlbum,
-      topTrack: listeningData.topTrack,
-      topTags: topTags,
-      dateRange: monthRange.label,
-      artistImagePath: artistImagePath,
-      albumImagePath: albumImagePath,
-      trackImagePath: trackImagePath,
-    };
+    const templateData = buildTemplateData(jsonReport);
 
     console.log('\n📊 Data Summary:');
     console.log(`   Username: ${templateData.username}`);
@@ -611,7 +731,7 @@ async function main() {
     console.log(`   Top Artist: ${templateData.topArtist.name} (${templateData.topArtist.playcount})`);
     console.log(`   Top Album: ${templateData.topAlbum.name} (${templateData.topAlbum.playcount})`);
     console.log(`   Top Track: ${templateData.topTrack.name} (${templateData.topTrack.playcount})`);
-    console.log(`   Top Tags: ${templateData.topTags.join(', ')}\n`);
+    console.log(`   Top Tags: ${templateData.topTags.map((t) => t.name).join(', ')}\n`);
 
     // Generate Typst template
     const typstTemplate = generateTypstTemplate(templateData);
@@ -635,7 +755,3 @@ async function main() {
 
 // Run the application
 main();
-
-
-
-
