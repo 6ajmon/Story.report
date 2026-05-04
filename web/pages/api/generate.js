@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { font, bg, accent, from, to, footer, forceFetch, mosaicArtistCount, enableMosaic, textColorMode } = req.body || {};
+  const { font, bg, accent, from, to, footer, forceFetch, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode } = req.body || {};
 
   const cwd = path.resolve(process.cwd(), '..');
   const node = process.execPath;
@@ -28,6 +28,9 @@ export default async function handler(req, res) {
   if (to) env.REPORT_DATE_TO = to;
   if (mosaicArtistCount) env.REPORT_MOSAIC_ARTIST_COUNT = String(mosaicArtistCount);
   if (enableMosaic !== undefined) env.REPORT_ENABLE_MOSAIC = String(enableMosaic);
+  if (enableStatistics !== undefined) env.REPORT_ENABLE_STATISTICS = String(enableStatistics);
+  if (enableTopItems !== undefined) env.REPORT_ENABLE_TOP_ITEMS = String(enableTopItems);
+  if (enableWordCloud !== undefined) env.REPORT_ENABLE_WORDCLOUD = String(enableWordCloud);
   if (textColorMode) env.REPORT_TEXT_COLOR_MODE = textColorMode;
 
   const args = [script];

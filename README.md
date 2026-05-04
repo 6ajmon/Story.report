@@ -1,57 +1,49 @@
 # Story.report
 
-Instagram Story report generator (1080x1920) built from Last.fm listening data, with an optional Next.js web UI for configuring and generating reports.
+Instagram Story report generator (1080x1920) built from Last.fm listening data, with a Next.js web UI for configuring, customizing, and previewing reports in real-time.
 
-## What the project does now
+## Features
 
-1. Fetches all scrobbles from the previous full calendar month.
-2. Calculates all core statistics locally from the same dataset:
-   - scrobble count,
-   - unique artists,
-   - unique albums,
-   - unique tracks,
-   - top artist, top album, top track.
-3. Builds top tags from the monthly top artists.
-4. Downloads images with fallbacks:
-   - artist: artist -> album -> track,
-   - album: album -> artist -> track,
-   - track: track/track album -> track album -> track artist -> top artist.
-5. Generates Typst and compiles PNG.
-6. Optional web UI can trigger generation and preview the latest report image.
-
-## Requirements
-
-- Node.js 18+
-- Typst CLI available in PATH
-- Last.fm account + API key
-- For the web UI: `cd web && npm install`
+- ✅ **Monthly Listening Report** - Generates Instagram Story (1080×1920) with listening stats
+- ✅ **Live Web UI** - Real-time preview and configuration with 50/50 layout (form + preview)
+- ✅ **Customizable Modules** - Toggle statistics, top items, mosaic, word cloud on/off
+- ✅ **Top Artists Mosaic** - Dynamic grid layout (2-5 artists per row, up to 10 artists)
+- ✅ **Word Cloud** - Tag cloud from top artists with accent color gradient
+- ✅ **Adaptive Text Colors** - Automatic white/black text based on background luminance
+- ✅ **Custom Date Ranges** - Override the default previous month with any date range
+- ✅ **Fontawesome Icons** - Star icon for artists, disc icon for albums, note for tracks
+- ✅ **Smart Image Fallbacks** - Multi-level fallback chain for artist/album/track images
+- ✅ **Intelligent Caching** - Caches Last.fm API responses, reuses on config changes
+- ✅ **No Avatar** - Lightweight, clean design without user avatar
 
 ## Quick Start
 
-1. Install dependencies:
+### 1. Install dependencies
 
 ```bash
 npm install
+cd web && npm install
 ```
 
-2. Create a .env file:
+### 2. Create `.env` file
 
 ```env
 LASTFM_API_KEY=your_api_key
 LASTFM_USERNAME=your_username
 ```
 
-3. Run the generator:
+### 3. Generate a report
 
+**CLI mode:**
 ```bash
 npm start
 ```
 
-4. Run the web UI:
-
+**Web UI mode:**
 ```bash
 npm run web
 ```
+Then open [http://localhost:3000](http://localhost:3000) to configure and preview in real-time.
 
 ## Folder Structure
 
@@ -91,6 +83,23 @@ Note: the generated directory is ignored by git.
 - downloaded helper images: generated/assets
 
 ## Customizing the report
+
+### Web UI Configuration
+
+The web UI provides real-time controls for:
+
+- **Font** - 8 font presets displayed in their own fonts
+- **Background Color** - Custom hex color for page background
+- **Accent Color** - Custom hex color for highlights and text
+- **Date Range** - Override the default previous month (ISO format: YYYY-MM-DD)
+- **Text Color Mode** - Auto (based on background luminance), Light (white), or Dark (black)
+- **Mosaic Artist Count** - 2, 4, 6, 8, or 10 artists in the top artists grid
+- **Module Toggles**:
+  - Statistics (artists, albums, tracks count)
+  - Top Artists Mosaic
+  - Top Items (top artist, album, track)
+  - Word Cloud (top tags)
+- **Footer Text** - Custom footer or leave empty to hide
 
 ### Change font
 Use the web UI font presets, or edit [config.js](config.js) if you want to change the default font family:

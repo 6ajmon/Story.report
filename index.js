@@ -26,8 +26,10 @@ const REPORT_OVERRIDES = {
   footerText: process.env.REPORT_FOOTER_TEXT || null,
   dateFrom: process.env.REPORT_DATE_FROM || null,
   dateTo: process.env.REPORT_DATE_TO || null,
-  mosaicArtistCount: parseInt(process.env.REPORT_MOSAIC_ARTIST_COUNT || '6', 10),
-  enableMosaic: process.env.REPORT_ENABLE_MOSAIC !== 'false',
+  mosaicArtistCount: parseInt(process.env.REPORT_MOSAIC_ARTIST_COUNT || '8', 10),  enableMosaic: process.env.REPORT_ENABLE_MOSAIC !== 'false',
+  enableStatistics: process.env.REPORT_ENABLE_STATISTICS !== 'false',
+  enableTopItems: process.env.REPORT_ENABLE_TOP_ITEMS !== 'false',
+  enableWordCloud: process.env.REPORT_ENABLE_WORDCLOUD !== 'false',
   textColorMode: process.env.REPORT_TEXT_COLOR_MODE || 'auto',
 };
 
@@ -254,7 +256,7 @@ function aggregateListeningData(tracks) {
     uniqueArtists: uniqueArtists.size,
     uniqueAlbums: uniqueAlbums.size,
     uniqueTracks: uniqueTracks.size,
-    topArtists: pickTopEntries(artistCounts, 6, (name, playcount, rank) => ({ rank, name, playcount })),
+    topArtists: pickTopEntries(artistCounts, 8, (name, playcount, rank) => ({ rank, name, playcount })),
     topAlbum: pickTopEntries(albumCounts, 1, (key, playcount) => {
       const [artist, name] = key.split(' — ');
       return { artist, name, playcount };
@@ -528,18 +530,10 @@ function generateArtistMosaic(topArtistsImages, mosaicCount, colors) {
     return '';
   }
 
-  // Determine grid layout
+  // Determine grid layout dynamically
   let cols, rows;
-  if (artists.length <= 4) {
-    cols = 2;
-    rows = 2;
-  } else if (artists.length === 5) {
-    cols = 3;
-    rows = 2;
-  } else {
-    cols = 3;
-    rows = 2;
-  }
+  cols = 4;
+  rows = 2;
 
   const cellSize = '1fr';
   const columnDef = Array(cols).fill(cellSize).join(', ');
@@ -548,7 +542,11 @@ function generateArtistMosaic(topArtistsImages, mosaicCount, colors) {
   for (const artist of artists) {
     if (artist.imagePath) {
       mosaicElements += `
-  [#image("${artist.imagePath}", width: 100%)],`;
+        [#box(
+          width: 100%,
+          height: auto,
+          clip: false,
+        )[ #image("${artist.imagePath}", width: 100%, fit: "contain") ]],`;
     } else {
       mosaicElements += `
   [#box(width: 100%, height: 100%, fill: rgb("${colors.secondary}"), stroke: 1pt + rgb("${colors.secondary}"))],`;
@@ -635,7 +633,7 @@ function generateTypstTemplate(data) {
   // Generate artist mosaic (only if enabled)
   let artistMosaic = '';
   if (REPORT_OVERRIDES.enableMosaic) {
-    const mosaicCount = REPORT_OVERRIDES.mosaicArtistCount || 6;
+    const mosaicCount = REPORT_OVERRIDES.mosaicArtistCount || 8;
     artistMosaic = generateArtistMosaic(topArtistsImages, mosaicCount, colors);
   }
 
@@ -662,11 +660,13 @@ function generateTypstTemplate(data) {
 #set text(font: ${font}, fill: rgb("${colors.text}"))
 
 // Header: Username and date range
-#text(size: 32pt, fill: rgb("${colors.textMuted}"))[
-  ${username}, ${dateRange}
+#align(right)[
+  #text(size: 32pt, fill: rgb("${colors.textMuted}"))[
+    ${username}, ${dateRange}
+  ]
 ]
 
-#v(-30pt)
+#v(-70pt)
 
 // Main stat: Monthly scrobbles
 #text(size: 108pt, weight: "bold")[
@@ -675,7 +675,7 @@ function generateTypstTemplate(data) {
   #text(size: 42pt, weight: "regular", fill: rgb("${colors.textMuted}"))[scrobbles]
 ]
 
-#v(-70pt)
+#v(-80pt)
 
 #text(size: 42pt, fill: rgb("${colors.secondary}"))[
   ${listeningTime}
@@ -683,13 +683,15 @@ function generateTypstTemplate(data) {
 
 #v(20pt)
 
+// Statistics: artists, albums, tracks count
+${REPORT_OVERRIDES.enableStatistics ? `
 #grid(
   columns: (1fr, 1fr, 1fr),
   column-gutter: 24pt,
   align: (left + horizon, left + horizon, left + horizon),
 
   [
-    #text(size: 32pt, weight: "bold", fill: rgb("${colors.secondary}"))[#fa-star()]
+    #text(size: 32pt, weight: "bold", fill: rgb("${colors.secondary}"))[#fa-star(solid: true)]
     #v(0pt)
     #text(size: 32pt, fill: rgb("${colors.secondary}"))[${uniqueArtists} artists]
   ],
@@ -707,21 +709,26 @@ function generateTypstTemplate(data) {
   ],
 )
 
-#v(40pt)
+#v(15pt)
+` : ''}
 
 #line(length: 100%, stroke: 1pt + rgb("${colors.secondary}"))
 
-#v(50pt)
+#v(15pt)
 
-// Top artists mosaic
-${artistMosaic ? `
-${artistMosaic}
+// Top artists mosaic (with max height constraint to 1/4 of page)
+${REPORT_OVERRIDES.enableMosaic ? `
+#box(width: 100%, height: auto, clip: false)[
+  ${artistMosaic}
+]
 
-#v(16pt)
+#v(40pt)
 ` : ''}
 
+// Top items: artist, album, track
+${REPORT_OVERRIDES.enableTopItems ? `
 #grid(
-  columns: (160pt, 1fr, 160pt),
+  columns: (166pt, 1fr, 160pt),
   column-gutter: 24pt,
   row-gutter: 28pt,
   align: (left + horizon, left + horizon, center + horizon),
@@ -730,8 +737,8 @@ ${artistMosaic}
   text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top artist],
   [
     #text(size: 36pt, weight: "bold")[${topArtist.name}]
-    #v(4pt)
-    #text(size: 26pt, fill: rgb("${colors.secondary}"))[${topArtist.playcount} scrobbles]
+    #v(0pt)
+    #text(size: 29pt, fill: rgb("${colors.secondary}"))[${topArtist.playcount} scrobbles]
   ],
   ${artistImageElement}
 
@@ -739,8 +746,8 @@ ${artistMosaic}
   text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top album],
   [
     #text(size: 36pt, weight: "bold")[${topAlbum.name}]
-    #v(4pt)
-    #text(size: 26pt, fill: rgb("${colors.secondary}"))[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
+    #v(0pt)
+    #text(size: 29pt, fill: rgb("${colors.secondary}"))[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
   ],
   ${albumImageElement}
 
@@ -748,24 +755,27 @@ ${artistMosaic}
   text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top track],
   [
     #text(size: 36pt, weight: "bold")[${topTrack.name}]
-    #v(4pt)
-    #text(size: 26pt, fill: rgb("${colors.secondary}"))[${topTrack.artist} · ${topTrack.playcount} scrobbles]
+    #v(0pt)
+    #text(size: 29pt, fill: rgb("${colors.secondary}"))[${topTrack.artist} · ${topTrack.playcount} scrobbles]
   ],
   ${trackImageElement}
 )
 
-#v(40pt)
+#v(28pt)
+` : ''}
 
-// Top tags
+// Top tags (word cloud)
+${REPORT_OVERRIDES.enableWordCloud ? `
 #text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[
   Top tags
 ]
 
-#v(0pt)
+#v(-40pt)
 
 ${tagCloud}
 
 #v(1fr)
+` : `#v(1fr)`}
 
 // Footer
 ${footerTextSafe ? `#align(center)[
@@ -875,15 +885,11 @@ async function fetchAndCacheReport() {
   // Fetch top artists images for mosaic
   const topArtistsImages = [];
   const topArtistsData = await Promise.all(
-    listeningData.topArtists.slice(0, 6).map((artist, index) =>
-      fetchEntityInfo('artist', artist)
-        .then(info => ({
-          artist,
-          info,
-          index,
-        }))
-        .catch(() => ({ artist, info: null, index }))
-    )
+    listeningData.topArtists.slice(0, REPORT_OVERRIDES.mosaicArtistCount).map(async (artist, index) => {
+      const info = await fetchEntityInfo('artist', artist).catch(() => null);
+      const imagePath = await downloadImage(extractImageUrls(info?.image), `artist-mosaic-${index}`);
+      return { artist, info, index, imagePath };
+    })
   );
 
   for (const { artist, info, index } of topArtistsData) {

@@ -17,10 +17,11 @@ Primary output:
 
 ## Invariants
 
-1. Time window
-- Always use the previous full calendar month.
+1. Time window (default behavior)
+- By default, uses the previous full calendar month.
 - Start: day 01 00:00:00 (local time).
 - End: last day of that month 23:59:59 (local time).
+- Can be overridden via REPORT_DATE_FROM and REPORT_DATE_TO environment variables (ISO format: YYYY-MM-DD).
 
 2. Data consistency
 - Core metrics must come from the same scrobble dataset fetched from user.getRecentTracks with from/to.
@@ -31,8 +32,14 @@ Primary output:
 - Keep downloaded images under generated/assets/.
 - Keep Typst source under generated/report.typ.
 - Keep final image under generated/report.png.
+- Compile with --pages 1 flag to export single page.
 
-4. Track image policy
+4. Module system
+- All report modules (statistics, mosaic, top items, word cloud) can be toggled via environment variables.
+- Default: all modules enabled.
+- REPORT_ENABLE_MOSAIC, REPORT_ENABLE_STATISTICS, REPORT_ENABLE_TOP_ITEMS, REPORT_ENABLE_WORDCLOUD.
+
+5. Image policy
 - Prefer top-track-specific image sources first.
 - Fallback order for track image:
   1) track image / track album image
@@ -40,9 +47,10 @@ Primary output:
   3) top-track artist image
   4) top-artist image
 
-5. Git hygiene
+6. Git hygiene
 - Never commit secrets (.env).
 - Never commit runtime artifacts from generated/.
+- utils.js is currently unused helper file (can be removed or enhanced for future features).
 
 ## Development workflow
 
@@ -89,3 +97,21 @@ Currently used Last.fm methods:
 - artist.getTopTags
 
 If adding methods, keep rate-limit-friendly usage and clear fallback handling.
+
+## Environment Overrides (REPORT_OVERRIDES)
+
+The web UI communicates with the generator through environment variables:
+
+- REPORT_FONT - Font family selection
+- REPORT_BG - Background color hex
+- REPORT_ACCENT - Accent color hex
+- REPORT_FOOTER_TEXT - Custom footer (empty = no footer)
+- REPORT_DATE_FROM/REPORT_DATE_TO - Custom date range
+- REPORT_MOSAIC_ARTIST_COUNT - Number of artists in mosaic (2-10)
+- REPORT_ENABLE_MOSAIC - Enable top artists mosaic
+- REPORT_ENABLE_STATISTICS - Enable statistics module
+- REPORT_ENABLE_TOP_ITEMS - Enable top items section
+- REPORT_ENABLE_WORDCLOUD - Enable word cloud
+- REPORT_TEXT_COLOR_MODE - Text color strategy (auto/light/dark)
+
+All overrides are optional; defaults apply if not specified.
