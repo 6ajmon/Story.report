@@ -2,13 +2,14 @@
 
 ## Overview
 
-The current architecture is built around a single source of truth: the scrobble list from the previous full calendar month.
+The current architecture is built around a single source of truth: the scrobble list from the previous full calendar month. The generator remains the backend source of truth, while the Next.js app is a thin configuration and preview layer.
 
 1. Fetch scrobbles from user.getRecentTracks with from/to parameters.
 2. Aggregate all statistics locally from that list.
 3. Make additional requests only for metadata such as images and tags.
 4. Generate Typst.
 5. Compile to PNG.
+6. Optionally serve a web UI that posts overrides to the generator and streams the latest PNG.
 
 ## Project Structure
 
@@ -20,6 +21,13 @@ story-report/
 ├── ARCHITECTURE.md
 ├── FAQ.md
 ├── AGENTS.md
+├── web/
+│  ├── package.json
+│  └── pages/
+│     ├── index.js
+│     └── api/
+│        ├── generate.js
+│        └── report-image.js
 └── generated/
    ├── report.typ
    ├── report.png
@@ -57,7 +65,8 @@ story-report/
 - lower risk of mixing monthly data with all-time data,
 - easier to extend with more report sections later.
 - **Typst** - CLI tool for PDF/PNG generation (REQUIRED)
-- **Node.js** - Runtime (v14+)
+- **Node.js** - Runtime (v18+ recommended)
+- **Next.js** - Optional web UI runtime in `web/`
 
 ### Operating Systems
 - ✅ Windows
@@ -73,9 +82,8 @@ story-report/
 5. **Image Formats** - Support PDF, SVG output
 6. **Custom Colors** - CLI arguments for color schemes
 7. **Scheduling** - Cron job to generate weekly/monthly reports
-8. **Web Interface** - Express.js server for web UI
-9. **User Statistics** - Additional metrics (genre breakdown, discovery)
-10. **Share Link** - Generate shareable link to report
+8. **User Statistics** - Additional metrics (genre breakdown, discovery)
+9. **Share Link** - Generate shareable link to report
 
 ## Debugging
 

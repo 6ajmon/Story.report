@@ -32,6 +32,13 @@ typst --version
 npm install
 ```
 
+For the web UI:
+
+```bash
+cd web
+npm install
+```
+
 ## 3. Configure .env
 
 ```env
@@ -43,6 +50,12 @@ LASTFM_USERNAME=your_username
 
 ```bash
 npm start
+```
+
+Or run the web UI:
+
+```bash
+npm run web
 ```
 
 ## 5. Find the output

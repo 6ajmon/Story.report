@@ -4,9 +4,11 @@
 
 # Dependencies
 node_modules/
+web/node_modules/
 
 # Generated runtime artifacts
 generated/
+web/.next/
 report.typ
 report.png
 report-*.png
@@ -20,6 +22,7 @@ track.jpg
 # Logs and local debug output
 logs/
 *.log
+web/npm-debug.log*
 output.log
 last_run.log
 npm-debug.log*

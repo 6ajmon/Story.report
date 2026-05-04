@@ -37,13 +37,24 @@ In generated/report.typ.
 ### Where are the downloaded images?
 In generated/assets.
 
+## Web UI
+
+### How do I open the web interface?
+Run:
+
+```bash
+npm run web
+```
+
+Then open the local Next.js app in the browser.
+
+### Where does the preview image come from?
+The image preview is streamed from `/api/report-image` inside the Next.js app and points to `generated/report.png`.
+
 ## Customization
 
 ### How do I change the font to monospace?
-Edit `config.js`, change `typography.font` to:
-```javascript
-font: 'Courier New', // or 'IBM Plex Mono', 'JetBrains Mono', etc.
-```
+Use the web UI `Mono preset`, or edit `config.js` and set `typography.font` to `mono`.
 
 ### What are the tag cloud sizes?
 Tags are displayed in a flowing word cloud. Font size scales from **14pt** (smallest count) to **32pt** (largest count). Tags are shuffled for organic appearance and use varying gray shades (darker = less popular, whiter = more popular).

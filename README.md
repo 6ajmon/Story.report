@@ -1,6 +1,6 @@
 # Story.report
 
-Instagram Story report generator (1080x1920) built from Last.fm listening data.
+Instagram Story report generator (1080x1920) built from Last.fm listening data, with an optional Next.js web UI for configuring and generating reports.
 
 ## What the project does now
 
@@ -17,12 +17,14 @@ Instagram Story report generator (1080x1920) built from Last.fm listening data.
    - album: album -> artist -> track,
    - track: track/track album -> track album -> track artist -> top artist.
 5. Generates Typst and compiles PNG.
+6. Optional web UI can trigger generation and preview the latest report image.
 
 ## Requirements
 
 - Node.js 18+
 - Typst CLI available in PATH
 - Last.fm account + API key
+- For the web UI: `cd web && npm install`
 
 ## Quick Start
 
@@ -45,6 +47,12 @@ LASTFM_USERNAME=your_username
 npm start
 ```
 
+4. Run the web UI:
+
+```bash
+npm run web
+```
+
 ## Folder Structure
 
 ```text
@@ -55,9 +63,15 @@ story-report/
 ├── ARCHITECTURE.md
 ├── FAQ.md
 ├── AGENTS.md
-├── .env.example
 ├── .gitignore
 ├── package.json
+├── web/
+│  ├── package.json
+│  └── pages/
+│     ├── index.js
+│     └── api/
+│        ├── generate.js
+│        └── report-image.js
 └── generated/
    ├── report.typ
    ├── report.png
@@ -79,7 +93,7 @@ Note: the generated directory is ignored by git.
 ## Customizing the report
 
 ### Change font
-Edit [config.js](config.js) to change the `typography.font` value:
+Use the web UI font presets, or edit [config.js](config.js) if you want to change the default font family:
 
 ```javascript
 typography: {
@@ -90,8 +104,8 @@ typography: {
 ```
 
 Common monospace fonts:
-- `Courier New` (default, works everywhere)
-- `IBM Plex Mono`
+- `Consolas` (default monospace fallback on Windows)
+- `Courier New`
 - `JetBrains Mono`
 - `Inconsolata`
 
@@ -121,7 +135,7 @@ icons: {
 ```
 
 ### Modify colors
-Edit [config.js](config.js) colors section, or directly in generateTypstTemplate function in [index.js](index.js).
+Use the web UI controls or edit [config.js](config.js) colors section.
 
 ## Extending the project
 
@@ -130,7 +144,8 @@ The main extension points are:
 - data aggregation: aggregateListeningData in index.js
 - layout and typography: generateTypstTemplate and generateTagCloud in index.js
 - image fallbacks: extractImageUrls, extractTrackImageUrls, downloadImage in index.js
-- tag cloud styling: generateTagCloud function in index.js (controls min/max font size: 14pt–28pt)
+- tag cloud styling: generateTagCloud function in index.js
+- web UI: web/pages/index.js and web/pages/api/report-image.js
 
 ## Troubleshooting
 
@@ -142,6 +157,9 @@ The main extension points are:
 3. Missing images:
    - Last.fm often returns empty image fields,
    - the project has fallbacks, but not every entity has artwork in the API.
+4. Web UI preview does not load:
+   - make sure `npm run web` is running from the repo root,
+   - the preview image is served from `/api/report-image` inside the Next.js app.
 
 ## Security
 

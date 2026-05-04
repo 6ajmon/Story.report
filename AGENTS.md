@@ -7,6 +7,11 @@ This repository generates a monthly Last.fm Instagram Story report.
 Primary runtime entrypoint:
 - index.js
 
+Primary web interface:
+- web/pages/index.js
+- web/pages/api/generate.js
+- web/pages/api/report-image.js
+
 Primary output:
 - generated/report.png
 
@@ -43,12 +48,17 @@ Primary output:
 
 1. Install dependencies
 - npm install
+- cd web && npm install
 
 2. Run generator
 - npm start
 
-3. Validate after code edits
+3. Run web UI
+- npm run web
+
+4. Validate after code edits
 - npm start
+- cd web && npm run build
 - Ensure generated/report.png is created.
 - Confirm date range in output matches previous full month.
 
@@ -63,6 +73,10 @@ When changing visual layout:
 - Edit generateTypstTemplate in index.js.
 - Keep 1080x1920 output size.
 - Avoid introducing unsupported fonts by default on Windows.
+
+When changing the web UI:
+- Edit files under web/pages.
+- Keep the preview endpoint serving generated/report.png with no-store caching.
 
 ## API notes
 
