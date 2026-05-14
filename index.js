@@ -662,11 +662,13 @@ function generateTypstTemplate(data) {
 // Header: Username and date range
 #align(right)[
   #text(size: 32pt, fill: rgb("${colors.textMuted}"))[
-    ${username}, ${dateRange}
+    ${username},
+    #linebreak()
+    ${dateRange}
   ]
 ]
 
-#v(-70pt)
+#v(-116pt)
 
 // Main stat: Monthly scrobbles
 #text(size: 108pt, weight: "bold")[
