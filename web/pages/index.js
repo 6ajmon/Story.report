@@ -256,6 +256,7 @@ export default function Home() {
           <label style={labelStyle}>
             <span style={labelTextStyle}>Top Artists Mosaic Count</span>
             <select value={mosaicArtistCount} onChange={(e) => setMosaicArtistCount(parseInt(e.target.value))} style={selectStyle} disabled={!enableMosaic}>
+              <option value={5}>5 artists</option>
               <option value={8}>8 artists</option>
             </select>
           </label>
