@@ -531,42 +531,89 @@ function generateArtistMosaic(topArtistsImages, mosaicCount, colors) {
   }
 
   // Determine grid layout dynamically
-  let cols, rows;
-  cols = 4;
-  rows = 2;
+  let cols = 4;
+  let rows = 2;
 
   const cellSize = '1fr';
   const columnDef = Array(cols).fill(cellSize).join(', ');
 
   let mosaicElements = '';
-  for (const artist of artists) {
-    if (artist.imagePath) {
-      mosaicElements += `
+
+  if (mosaicCount === 5) {
+    // 5 artists pattern: outer grid with 2 columns, inner grid with 2x2 cells
+    const bigArtist = artists[0];
+    let bigArtistElement = '';
+    
+    if (bigArtist && bigArtist.imagePath) {
+      bigArtistElement = `[#box(
+    width: 100%,
+    height: auto,
+    clip: false,
+  )[ #image("${bigArtist.imagePath}", width: 100%, height: auto, fit: "contain") ]]`;
+    } else {
+      bigArtistElement = `[#box(width: 100%, height: auto, fill: rgb("${colors.secondary}"), stroke: 1pt + rgb("${colors.secondary}"))]`;
+    }
+
+    let smallElements = '';
+    for (let i = 1; i < 5; i++) {
+      const artist = artists[i];
+      if (artist && artist.imagePath) {
+        smallElements += `
+    [#box(
+      width: 100%,
+      height: auto,
+      clip: false,
+    )[ #image("${artist.imagePath}", width: 100%, height: auto, fit: "contain") ]],`;
+      } else {
+        smallElements += `
+    [#box(width: 100%, height: auto, fill: rgb("${colors.secondary}"), stroke: 1pt + rgb("${colors.secondary}"))],`;
+      }
+    }
+
+    return `#grid(
+  columns: (1fr, 1fr),
+  column-gutter: 8pt,
+  ${bigArtistElement},
+  grid(
+    columns: (1fr, 1fr),
+    column-gutter: 8pt,
+    row-gutter: 8pt,
+${smallElements}
+  )
+)`;
+
+  } else {
+    // 8 artists pattern (default) or other counts
+    for (const artist of artists) {
+      if (artist.imagePath) {
+        mosaicElements += `
         [#box(
           width: 100%,
           height: auto,
           clip: false,
         )[ #image("${artist.imagePath}", width: 100%, fit: "contain") ]],`;
-    } else {
-      mosaicElements += `
+      } else {
+        mosaicElements += `
   [#box(width: 100%, height: 100%, fill: rgb("${colors.secondary}"), stroke: 1pt + rgb("${colors.secondary}"))],`;
+      }
     }
-  }
 
-  // Add empty cells if needed to fill grid
-  const totalCells = cols * rows;
-  for (let i = artists.length; i < totalCells; i++) {
-    mosaicElements += `
+    // Add empty cells if needed to fill grid
+    const totalCells = cols * rows; // currently fixed to 4x2 = 8
+    for (let i = artists.length; i < totalCells; i++) {
+      mosaicElements += `
   [],`;
-  }
+    }
 
-  return `#grid(
+    return `#grid(
   columns: (${columnDef}),
   column-gutter: 8pt,
   row-gutter: 8pt,
   ${mosaicElements}
 )`;
+  }
 }
+
 function generateTypstTemplate(data) {
   console.log('🎨 Generating Story.report Typst template...');
 
@@ -887,7 +934,7 @@ async function fetchAndCacheReport() {
   // Fetch top artists images for mosaic
   const topArtistsImages = [];
   const topArtistsData = await Promise.all(
-    listeningData.topArtists.slice(0, REPORT_OVERRIDES.mosaicArtistCount).map(async (artist, index) => {
+    listeningData.topArtists.slice(0, 8).map(async (artist, index) => {
       const info = await fetchEntityInfo('artist', artist).catch(() => null);
       const imagePath = await downloadImage(extractImageUrls(info?.image), `artist-mosaic-${index}`);
       return { artist, info, index, imagePath };
