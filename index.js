@@ -460,7 +460,7 @@ function generateTagCloud(tagsWithCounts, maxTags = 20, accentColor = '#e8d5a3',
     .join(',\n    ');
 
   // Generate palette based on accent color with varying opacity/lightness
-  const generateAccentPalette = (count) => {
+  const generateAccentPalette = (count, countsArray = [], minC = 0, maxC = 0) => {
     const safeCount = Math.min(Math.max(count, 1), maxTags);
     const accentHex = accentColor.replace('#', '');
     const accentR = parseInt(accentHex.substr(0, 2), 16);
@@ -474,28 +474,49 @@ function generateTagCloud(tagsWithCounts, maxTags = 20, accentColor = '#e8d5a3',
       return [{ accentColor, textColor }];
     }
 
+    const minCountVal = typeof minC === 'number' ? minC : 0;
+    const maxCountVal = typeof maxC === 'number' ? maxC : 0;
+
     return Array.from({ length: safeCount }, (_, i) => {
-      const t = i / (safeCount - 1);
-      // Create variations of accent color by blending with black or white
-      const blendFactor = 0.3 + (0.7 * (1 - t)); // 30% to 100% of original color intensity
-      
-      const r = Math.round(accentR * blendFactor);
-      const g = Math.round(accentG * blendFactor);
-      const b = Math.round(accentB * blendFactor);
-      
-      const hex = [r, g, b]
-        .map(x => x.toString(16).padStart(2, '0'))
+      const tagCount = countsArray && countsArray[i] ? countsArray[i] : 0;
+      const weightNorm = maxCountVal === minCountVal ? 1 : (tagCount - minCountVal) / (maxCountVal - minCountVal);
+      const norm = Math.max(0, Math.min(1, weightNorm));
+
+      // Blend factor: larger tags (norm ~1) get closer to original accent (blend ~1)
+      // smaller tags (norm ~0) get closer to mix target (white for light bg, black for dark bg)
+      const blendFactor = 0.3 + 0.7 * norm; // ranges 0.3..1.0
+
+      let rComp, gComp, bComp;
+      if (isDarkBg) {
+        // blend toward black
+        rComp = Math.round(accentR * blendFactor);
+        gComp = Math.round(accentG * blendFactor);
+        bComp = Math.round(accentB * blendFactor);
+      } else {
+        // blend toward white (255)
+        rComp = Math.round(accentR * blendFactor + 255 * (1 - blendFactor));
+        gComp = Math.round(accentG * blendFactor + 255 * (1 - blendFactor));
+        bComp = Math.round(accentB * blendFactor + 255 * (1 - blendFactor));
+      }
+
+      const hex = [rComp, gComp, bComp]
+        .map(x => Math.max(0, Math.min(255, x)).toString(16).padStart(2, '0'))
         .join('');
-      
+
       return { accentColor: `#${hex}`, textColor };
     });
   };
 
-  const paletteWithText = generateAccentPalette(topTags.length);
+  // Normalize tag counts so larger tags keep original color and smaller tags blend
+  const counts = topTags.map(t => t.count || 0);
+  const maxCount = Math.max(...counts);
+  const minCount = Math.min(...counts);
+
+  const paletteWithText = generateAccentPalette(topTags.length, counts, minCount, maxCount);
   const paletteEntries = paletteWithText
     .map(({ accentColor }) => `rgb("${accentColor}")`)
     .join(',\n        ');
-  
+
   // Use text color from first entry (all are same for light/dark bg)
   const textColorForCloud = paletteWithText[0]?.textColor || '#ffffff';
 
