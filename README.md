@@ -15,6 +15,8 @@ Instagram Story report generator (1080x1920) built from Last.fm listening data, 
 - ✅ **Fontawesome Icons** - Star icon for artists, disc icon for albums, note for tracks
 - ✅ **Smart Image Fallbacks** - Multi-level fallback chain for artist/album/track images
 - ✅ **Intelligent Caching** - Caches Last.fm API responses, reuses on config changes
+- ✅ **Expanded Font Catalog** - 40+ grouped fonts (sans-serif, serif, mono, decorative) with live preview, auto-filtered to only fonts Typst can render on the machine
+- ✅ **Image Color Presets** - One-click background + accent extraction from the Top Artist, Top Album, or Top Track artwork (median-cut quantization), with WCAG contrast enforcement so accent text stays readable
 - ✅ **No Avatar** - Lightweight, clean design without user avatar
 
 ## Quick Start
@@ -60,11 +62,15 @@ story-report/
 ├── package.json
 ├── web/
 │  ├── package.json
+│  ├── lib/
+│  │  └── palette.js          # median-cut color extraction for presets
 │  └── pages/
 │     ├── index.js
 │     └── api/
 │        ├── generate.js
-│        └── report-image.js
+│        ├── report-image.js
+│        ├── report-assets.js # serves generated/assets for the UI
+│        └── report-images.js # lists top artist/album/track images
 └── generated/
    ├── report.typ
    ├── report.png

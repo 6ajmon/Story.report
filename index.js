@@ -98,25 +98,35 @@ function normalizeArray(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-// Calculate luminance of a hex color (0-1, where 1 is brightest)
-function getColorLuminance(hexColor) {
+// Relative luminance per WCAG (0-1, where 1 is brightest)
+function getRelativeLuminance(hexColor) {
   const hex = hexColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16) / 255;
-  const g = parseInt(hex.substr(2, 2), 16) / 255;
-  const b = parseInt(hex.substr(4, 2), 16) / 255;
-
-  // Standard luminance formula
-  return 0.299 * r + 0.587 * g + 0.114 * b;
+  const toLinear = (c) => {
+    c /= 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const r = toLinear(parseInt(hex.substr(0, 2), 16));
+  const g = toLinear(parseInt(hex.substr(2, 2), 16));
+  const b = toLinear(parseInt(hex.substr(4, 2), 16));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-// Get appropriate text color based on background luminance
+// WCAG contrast ratio between two hex colors (1..21)
+function getContrastRatio(hexA, hexB) {
+  const l1 = getRelativeLuminance(hexA);
+  const l2 = getRelativeLuminance(hexB);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+// Choose the text color (white/black) with the best contrast against the bg
 function getTextColor(bgColor, textColorMode = 'auto') {
   if (textColorMode === 'light') return 'ffffff';
   if (textColorMode === 'dark') return '000000';
-  
-  // Auto mode: use luminance to decide
-  const luminance = getColorLuminance(bgColor);
-  return luminance > 0.5 ? '000000' : 'ffffff';
+
+  // Auto mode: pick whichever of white/black gives the higher WCAG contrast
+  const whiteRatio = getContrastRatio(bgColor, 'ffffff');
+  const blackRatio = getContrastRatio(bgColor, '000000');
+  return whiteRatio >= blackRatio ? 'ffffff' : '000000';
 }
 
 function getDateRange() {
@@ -308,7 +318,9 @@ function resolveTypstFontSpec(requestedFont, monoFont) {
     return formatTypstFontList(fontName.split(',').map((part) => part.trim()));
   }
 
-  return `"${escapeTypstString(fontName)}"`;
+  // Single named font: provide Segoe UI as a fallback so a missing font
+  // degrades gracefully instead of failing the Typst compile.
+  return formatTypstFontList([fontName, 'Segoe UI']);
 }
 
 async function fetchEntityInfo(entityType, entityData) {
@@ -730,9 +742,9 @@ function generateTypstTemplate(data) {
 // Header: Username and date range
 #align(right)[
   #text(size: 32pt, fill: rgb("${colors.textMuted}"))[
-    ${username},
+    ${dateRange},
     #linebreak()
-    ${dateRange}
+    ${username}
   ]
 ]
 
