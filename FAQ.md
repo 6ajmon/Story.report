@@ -77,8 +77,11 @@ The report has three text color modes:
 
 Use "Auto" mode for best contrast on custom backgrounds.
 
-### How do I change the font to monospace?
-Use the web UI `Mono preset`, or edit `config.js` and set `typography.font` to `mono`.
+### How do I change the font?
+Use the web UI **Font** dropdown - it groups **40+ fonts** (Sans-serif, Serif, Monospace, Display/Decorative) plus the `Mono preset` and `Serif preset`. Only fonts Typst can actually render on your machine are shown (auto-detected via `typst fonts`); a small note under the dropdown shows the count. You can also edit `config.js` and set `typography.font` to any renderable font name; if a font is missing, the report falls back to `Segoe UI`.
+
+### How do the image color presets work?
+In the web UI, open **Color Presets from Image** and click `Top Artist`, `Top Album`, or `Top Track`. The report downsamples the artwork, runs median-cut quantization to build a palette, then proposes two colors: a **background** (dominant color, darkened when dark) and an **accent** (most vibrant color distinct from the background). The accent is then adjusted (lightened on dark backgrounds, darkened on light ones) until it reaches a **WCAG AA contrast ratio of at least 4.5:1** against the background, so accent-colored text stays clearly readable. Both colors are applied to the form and the report regenerates automatically.
 
 ### What are the tag cloud sizes?
 Tags are displayed in a flowing word cloud. Font size scales from **14pt** (smallest count) to **32pt** (largest count). Tags are shuffled for organic appearance and use varying gray shades (darker = less popular, whiter = more popular).

@@ -27,6 +27,11 @@ export const config = {
 
   // Typography
   typography: {
+    // Font catalog is managed in the web UI (web/pages/index.js). Common options:
+    // Sans-serif: Segoe UI, Arial, Calibri, Tahoma, Verdana, Trebuchet MS, Bahnschrift
+    // Serif:      Georgia, Times New Roman, Cambria, Garamond, Palatino Linotype
+    // Mono:       Consolas, Courier New, Lucida Console, Cascadia Mono
+    // Decorative: Segoe Print, Comic Sans MS, Ink Free
     font: 'Segoe UI',          // Change to 'Courier New', 'IBM Plex Mono', 'JetBrains Mono', etc. for monospace
     monoFont: 'Consolas',   // Monospace alternative that is usually available on Windows
     title: {

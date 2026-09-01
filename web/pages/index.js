@@ -1,15 +1,96 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { medianCutQuantize, extractBackgroundAndAccent } from '../lib/palette';
 
-const FONT_OPTIONS = [
-  { value: 'Segoe UI', label: 'Segoe UI' },
-  { value: 'mono', label: 'Mono preset' },
-  { value: 'serif', label: 'Serif preset' },
-  { value: 'Consolas', label: 'Consolas' },
-  { value: 'Courier New', label: 'Courier New' },
-  { value: 'Georgia', label: 'Georgia' },
-  { value: 'Arial', label: 'Arial' },
-  { value: 'Times New Roman', label: 'Times New Roman' },
+// Expanded font catalog (grouped). Values are real Windows/system font names
+// passed straight to the generator; Typst falls back to Segoe UI if missing.
+const FONT_GROUPS = [
+  {
+    label: 'Presets',
+    options: [
+      { value: 'mono', label: 'Mono preset' },
+      { value: 'serif', label: 'Serif preset' },
+    ],
+  },
+  {
+    label: 'Sans-serif',
+    options: [
+      { value: 'Segoe UI', label: 'Segoe UI' },
+      { value: 'Arial', label: 'Arial' },
+      { value: 'Calibri', label: 'Calibri' },
+      { value: 'Tahoma', label: 'Tahoma' },
+      { value: 'Verdana', label: 'Verdana' },
+      { value: 'Trebuchet MS', label: 'Trebuchet MS' },
+      { value: 'Franklin Gothic Medium', label: 'Franklin Gothic Medium' },
+      { value: 'Franklin Gothic', label: 'Franklin Gothic' },
+      { value: 'Century Gothic', label: 'Century Gothic' },
+      { value: 'Candara', label: 'Candara' },
+      { value: 'Corbel', label: 'Corbel' },
+      { value: 'Bahnschrift', label: 'Bahnschrift' },
+      { value: 'Segoe UI Light', label: 'Segoe UI Light' },
+      { value: 'Segoe UI Semibold', label: 'Segoe UI Semibold' },
+      { value: 'Lucida Sans Unicode', label: 'Lucida Sans Unicode' },
+      { value: 'Gill Sans MT', label: 'Gill Sans MT' },
+      { value: 'Microsoft Sans Serif', label: 'Microsoft Sans Serif' },
+    ],
+  },
+  {
+    label: 'Serif',
+    options: [
+      { value: 'Georgia', label: 'Georgia' },
+      { value: 'Times New Roman', label: 'Times New Roman' },
+      { value: 'Cambria', label: 'Cambria' },
+      { value: 'Garamond', label: 'Garamond' },
+      { value: 'Book Antiqua', label: 'Book Antiqua' },
+      { value: 'Palatino Linotype', label: 'Palatino Linotype' },
+      { value: 'Constantia', label: 'Constantia' },
+      { value: 'Rockwell', label: 'Rockwell' },
+      { value: 'Goudy Old Style', label: 'Goudy Old Style' },
+      { value: 'Bodoni MT', label: 'Bodoni MT' },
+      { value: 'Perpetua', label: 'Perpetua' },
+      { value: 'Bookman Old Style', label: 'Bookman Old Style' },
+    ],
+  },
+  {
+    label: 'Monospace',
+    options: [
+      { value: 'Consolas', label: 'Consolas' },
+      { value: 'Courier New', label: 'Courier New' },
+      { value: 'Lucida Console', label: 'Lucida Console' },
+      { value: 'DejaVu Sans Mono', label: 'DejaVu Sans Mono' },
+      { value: 'Ubuntu Mono', label: 'Ubuntu Mono' },
+      { value: 'Cascadia Mono', label: 'Cascadia Mono' },
+      { value: 'Cascadia Code', label: 'Cascadia Code' },
+    ],
+  },
+  {
+    label: 'Display / Decorative',
+    options: [
+      { value: 'Segoe Print', label: 'Segoe Print' },
+      { value: 'Segoe Script', label: 'Segoe Script' },
+      { value: 'Comic Sans MS', label: 'Comic Sans MS' },
+      { value: 'Brush Script MT', label: 'Brush Script MT' },
+      { value: 'Ink Free', label: 'Ink Free' },
+      { value: 'Chiller', label: 'Chiller' },
+    ],
+  },
 ];
+
+// CSS fallback stack used only to preview a font in the <select>.
+function fontPreviewFamily(fontName) {
+  if (fontName === 'mono') return 'Consolas, monospace';
+  if (fontName === 'serif') return 'Georgia, serif';
+  return `'${fontName}', sans-serif`;
+}
+
+// A catalog font is usable if Typst reports it (exact face or family prefix).
+function isTypstFontAvailable(fontValue, typstFaces) {
+  if (fontValue === 'mono' || fontValue === 'serif') return true;
+  const v = fontValue.toLowerCase();
+  return typstFaces.some((face) => {
+    const f = face.toLowerCase();
+    return f === v || f.startsWith(`${v} `);
+  });
+}
 
 export default function Home() {
   const [font, setFont] = useState('Segoe UI');
@@ -24,6 +105,7 @@ export default function Home() {
   const [enableTopItems, setEnableTopItems] = useState(true);
   const [enableWordCloud, setEnableWordCloud] = useState(true);
   const [textColorMode, setTextColorMode] = useState('auto');
+  const [typstFaces, setTypstFaces] = useState(null); // null = not checked yet
   const [status, setStatus] = useState('');
   const [imageUrl, setImageUrl] = useState(null);
   const [imageVersion, setImageVersion] = useState(0);
@@ -48,6 +130,41 @@ export default function Home() {
       }
     };
   }, [font, bg, accent, from, to, footer, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode]);
+
+  // Load the list of fonts Typst can render and hide unavailable ones.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/fonts')
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const faces = data && data.ok ? data.fonts : null;
+        setTypstFaces(faces);
+        if (faces) {
+          setFont((current) => (isTypstFontAvailable(current, faces) ? current : 'Segoe UI'));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setTypstFaces(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Catalog fonts filtered to what Typst can actually render on this machine.
+  const visibleFontGroups = useMemo(() => {
+    if (!typstFaces) return FONT_GROUPS;
+    return FONT_GROUPS.map((group) => ({
+      ...group,
+      options: group.options.filter((opt) => isTypstFontAvailable(opt.value, typstFaces)),
+    })).filter((group) => group.options.length > 0);
+  }, [typstFaces]);
+
+  const allCatalogOptions = FONT_GROUPS.flatMap((g) => g.options);
+  const availableFontCount = typstFaces
+    ? allCatalogOptions.filter((opt) => isTypstFontAvailable(opt.value, typstFaces)).length
+    : null;
 
   async function generateReport(forceFetch = false) {
     setStatus(forceFetch ? '⏳ Force fetching...' : '⏳ Generating...');
@@ -74,6 +191,66 @@ export default function Home() {
       setStatus('❌ Error: ' + err.message);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  // ---- Color presets from generated images ----
+
+  function loadImage(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Could not load image for color extraction'));
+      img.src = url;
+    });
+  }
+
+  // Sample the image down to a small grid, run median-cut quantization,
+  // and return a { bg, accent } hex pair extracted from the artwork.
+  async function extractPaletteFromAsset(file) {
+    const url = `/api/report-assets?file=${encodeURIComponent(file)}`;
+    const img = await loadImage(url);
+
+    const size = 96;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    const scale = Math.max(size / img.naturalWidth, size / img.naturalHeight);
+    const w = img.naturalWidth * scale;
+    const h = img.naturalHeight * scale;
+    ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+
+    const imageData = ctx.getImageData(0, 0, size, size).data;
+    const pixels = [];
+    for (let i = 0; i < imageData.length; i += 4) {
+      if (imageData[i + 3] < 125) continue; // skip transparent pixels
+      pixels.push([imageData[i], imageData[i + 1], imageData[i + 2]]);
+    }
+
+    const palette = medianCutQuantize(pixels, 8);
+    return extractBackgroundAndAccent(palette);
+  }
+
+  async function applyImagePreset(type) {
+    const labels = { artist: 'Top Artist', album: 'Top Album', track: 'Top Track' };
+    setStatus(`⏳ Extracting colors from ${labels[type] || type} image...`);
+    try {
+      const resp = await fetch('/api/report-images');
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || 'No report images available');
+      const file = data.images && data.images[type];
+      if (!file) throw new Error(`No ${labels[type] || type} image available yet`);
+
+      const { bg: newBg, accent: newAccent } = await extractPaletteFromAsset(file);
+      setBg(newBg);
+      setAccent(newAccent);
+      setStatus(`🎨 ${labels[type] || type} preset applied`);
+      setTimeout(() => setStatus(''), 2000);
+    } catch (err) {
+      setStatus('❌ ' + err.message);
     }
   }
 
@@ -196,6 +373,12 @@ export default function Home() {
     padding: '4px',
   };
 
+  const presetButtonStyle = {
+    ...buttonSecondaryStyle,
+    flex: 1,
+    minWidth: '110px',
+  };
+
   return (
     <div style={containerStyle}>
       <div style={formContainerStyle}>
@@ -212,21 +395,28 @@ export default function Home() {
               onChange={(e) => setFont(e.target.value)}
               style={{
                 ...selectStyle,
-                fontFamily: font === 'mono' ? 'Consolas, monospace' : font === 'serif' ? 'Georgia, serif' : font,
+                fontFamily: fontPreviewFamily(font),
               }}
             >
-              {FONT_OPTIONS.map((opt) => (
-                <option
-                  key={opt.value}
-                  value={opt.value}
-                  style={{
-                    fontFamily: opt.value === 'mono' ? 'Consolas, monospace' : opt.value === 'serif' ? 'Georgia, serif' : opt.value,
-                  }}
-                >
-                  {opt.label}
-                </option>
+              {visibleFontGroups.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.options.map((opt) => (
+                    <option
+                      key={opt.value}
+                      value={opt.value}
+                      style={{ fontFamily: fontPreviewFamily(opt.value) }}
+                    >
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
+            {availableFontCount != null && (
+              <span style={{ color: '#888', fontSize: '12px', fontWeight: '400', textTransform: 'none', letterSpacing: '0' }}>
+                {availableFontCount} of {allCatalogOptions.length} fonts are renderable by Typst on this machine
+              </span>
+            )}
           </label>
 
           {/* Background color */}
@@ -240,6 +430,22 @@ export default function Home() {
             <span style={labelTextStyle}>Accent Color</span>
             <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} style={colorInputStyle} />
           </label>
+
+          {/* Color presets extracted from generated images */}
+          <div style={{ borderTop: '1px solid #333', paddingTop: '12px', marginTop: '12px' }}>
+            <span style={labelTextStyle}>Color Presets from Image</span>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+              <button onClick={() => applyImagePreset('artist')} style={presetButtonStyle} disabled={isLoading}>
+                🎤 Top Artist
+              </button>
+              <button onClick={() => applyImagePreset('album')} style={presetButtonStyle} disabled={isLoading}>
+                💿 Top Album
+              </button>
+              <button onClick={() => applyImagePreset('track')} style={presetButtonStyle} disabled={isLoading}>
+                🎵 Top Track
+              </button>
+            </div>
+          </div>
 
           {/* Date range */}
           <label style={labelStyle}>

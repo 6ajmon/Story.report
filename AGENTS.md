@@ -11,6 +11,9 @@ Primary web interface:
 - web/pages/index.js
 - web/pages/api/generate.js
 - web/pages/api/report-image.js
+- web/pages/api/report-assets.js (serves generated/assets/ to the UI)
+- web/pages/api/report-images.js (lists top artist/album/track image files)
+- web/lib/palette.js (median-cut color extraction used by image color presets)
 
 Primary output:
 - generated/report.png
