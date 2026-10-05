@@ -27,6 +27,7 @@ story-report/
 │     ├── index.js
 │     └── api/
 │        ├── generate.js
+│        ├── validate.js
 │        └── report-image.js
 └── generated/
    ├── report.typ
@@ -129,6 +130,11 @@ typst compile template.typ.example out.png
 - `REPORT_ENABLE_TOP_ITEMS` - Enable/disable top items section (default: true)
 - `REPORT_ENABLE_WORDCLOUD` - Enable/disable word cloud (default: true)
 - `REPORT_TEXT_COLOR_MODE` - Text color mode: 'auto' (default), 'light', 'dark'
+- `REPORT_LASTFM_USERNAME` - Per-run Last.fm username (falls back to `LASTFM_USERNAME`)
+- `REPORT_LASTFM_API_KEY` - Per-run Last.fm API key (falls back to `LASTFM_API_KEY`)
+
+The web UI's `/api/validate` endpoint checks username + API key pairs via the
+Last.fm `user.getInfo` method before generating a report.
 
 ## Contributing
 
