@@ -95,6 +95,7 @@ Note: the generated directory is ignored by git.
 
 The web UI provides real-time controls for:
 
+- **Last.fm Credentials** - Optional username + API key fields (with a **🔍 Sprawdź i pobierz** button that validates them against the Last.fm API). Leave empty to use `LASTFM_USERNAME` / `LASTFM_API_KEY` from `.env`. Get a key at [last.fm/api/account/create](https://www.last.fm/api/account/create).
 - **Font** - 8 font presets displayed in their own fonts
 - **Background Color** - Custom hex color for page background
 - **Accent Color** - Custom hex color for highlights and text

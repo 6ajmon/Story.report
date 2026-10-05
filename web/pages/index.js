@@ -105,6 +105,12 @@ export default function Home() {
   const [enableTopItems, setEnableTopItems] = useState(true);
   const [enableWordCloud, setEnableWordCloud] = useState(true);
   const [textColorMode, setTextColorMode] = useState('auto');
+  // Last.fm credentials (optional — fall back to server-side .env when empty)
+  const [username, setUsername] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [credState, setCredState] = useState('idle'); // idle | checking | ok | error
+  const [credStatus, setCredStatus] = useState('');
   const [typstFaces, setTypstFaces] = useState(null); // null = not checked yet
   const [status, setStatus] = useState('');
   const [imageUrl, setImageUrl] = useState(null);
@@ -166,6 +172,40 @@ export default function Home() {
     ? allCatalogOptions.filter((opt) => isTypstFontAvailable(opt.value, typstFaces)).length
     : null;
 
+  async function checkCredentials() {
+    const user = username.trim();
+    const key = apiKey.trim();
+    if (!user || !key) {
+      setCredState('error');
+      setCredStatus('❌ Podaj nazwę użytkownika i klucz API');
+      return;
+    }
+    setCredState('checking');
+    setCredStatus('⏳ Sprawdzam dane logowania...');
+    try {
+      const resp = await fetch('/api/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, apiKey: key }),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        setCredState('ok');
+        setCredStatus(
+          `✅ Dane poprawne: ${data.user.username} — ${data.user.playcount.toLocaleString('pl-PL')} scrobble'i`
+        );
+        // Credentials verified — regenerate using them right away.
+        generateReport(true);
+      } else {
+        setCredState('error');
+        setCredStatus('❌ ' + (data.error || 'Nieprawidłowe dane logowania'));
+      }
+    } catch (err) {
+      setCredState('error');
+      setCredStatus('❌ ' + err.message);
+    }
+  }
+
   async function generateReport(forceFetch = false) {
     setStatus(forceFetch ? '⏳ Force fetching...' : '⏳ Generating...');
     setImageUrl(null);
@@ -174,7 +214,7 @@ export default function Home() {
       const resp = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ font, bg, accent, from, to, footer, forceFetch, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode }),
+        body: JSON.stringify({ font, bg, accent, from, to, footer, forceFetch, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode, username: username.trim(), apiKey: apiKey.trim() }),
       });
       const data = await resp.json();
       if (data.ok) {
@@ -366,6 +406,22 @@ export default function Home() {
     minHeight: '20px',
   };
 
+  const credStatusStyle = {
+    fontSize: '13px',
+    fontWeight: '500',
+    minHeight: '18px',
+    color: credState === 'error' ? '#ff6b6b' : credState === 'ok' ? '#a8d5ba' : '#ffd700',
+  };
+
+  const linkStyle = {
+    color: '#e8d5a3',
+    fontSize: '12px',
+    fontWeight: '400',
+    textTransform: 'none',
+    letterSpacing: '0',
+    textDecoration: 'underline',
+  };
+
   const colorInputStyle = {
     ...inputStyle,
     cursor: 'pointer',
@@ -387,6 +443,81 @@ export default function Home() {
         </h1>
 
         <div style={formStyle}>
+          {/* Last.fm credentials */}
+          <div style={{ borderBottom: '1px solid #333', paddingBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <span style={labelTextStyle}>Last.fm Account</span>
+
+            <label style={labelStyle}>
+              <span style={{ ...labelTextStyle, textTransform: 'none', letterSpacing: '0' }}>Username</span>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                style={inputStyle}
+                placeholder="np. uzytkownik"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              <span style={{ ...labelTextStyle, textTransform: 'none', letterSpacing: '0' }}>
+                API Key{' '}
+                <a
+                  href="https://www.last.fm/api/account/create"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={linkStyle}
+                >
+                  Zdobądź klucz API ↗
+                </a>
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  style={{ ...inputStyle, flex: 1, fontFamily: showApiKey ? "'Consolas', monospace" : 'inherit' }}
+                  placeholder="32-znakowy klucz z last.fm/api"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey((v) => !v)}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #333',
+                    background: '#2a2a2a',
+                    color: '#aaa',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                  }}
+                  title={showApiKey ? 'Ukryj klucz' : 'Pokaż klucz'}
+                >
+                  {showApiKey ? '🙈' : '👁'}
+                </button>
+              </div>
+            </label>
+
+            <button
+              type="button"
+              onClick={checkCredentials}
+              style={buttonStyle}
+              disabled={credState === 'checking' || isLoading}
+            >
+              🔍 Sprawdź i pobierz
+            </button>
+
+            {credStatus && <div style={credStatusStyle}>{credStatus}</div>}
+
+            <span style={{ color: '#777', fontSize: '12px', fontWeight: '400', textTransform: 'none', letterSpacing: '0' }}>
+              Pola są opcjonalne — pozostaw puste, aby użyć danych z pliku <code>.env</code>.
+            </span>
+          </div>
+
           {/* Font selection with font preview */}
           <label style={labelStyle}>
             <span style={labelTextStyle}>Font</span>
