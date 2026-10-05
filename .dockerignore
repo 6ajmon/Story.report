@@ -1,0 +1,10 @@
+node_modules
+web/node_modules
+web/.next
+generated
+.git
+.gitignore
+.env
+.env.local
+logs
+*.log

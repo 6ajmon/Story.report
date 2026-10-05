@@ -1,0 +1,42 @@
+name: Deploy na minipc
+
+# Auto-deploy: po pushu na main laczymy sie z tailnetem i uruchamiamy
+# /srv/story-report/deploy.sh na serwerze minipc (Tailscale Serve).
+#
+# Wymagane sekrety w repo (Settings -> Secrets and variables -> Actions):
+#   TS_OAUTH_CLIENT_ID / TS_OAUTH_SECRET  - klient OAuth Tailscale z tagiem tag:ci
+#   DEPLOY_HOST                            - adres serwera w tailnecie (100.104.127.69)
+#   DEPLOY_USER                            - root
+#   DEPLOY_SSH_KEY                         - klucz prywatny /root/.ssh/gh_deploy_ed25519
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-minipc
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy Story.report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Polacz z tailnetem (Tailscale)
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Deploy przez SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 \
+              "$DEPLOY_USER@$DEPLOY_HOST" /srv/story-report/deploy.sh
