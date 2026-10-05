@@ -175,11 +175,7 @@ export default function Home() {
   async function checkCredentials() {
     const user = username.trim();
     const key = apiKey.trim();
-    if (!user || !key) {
-      setCredState('error');
-      setCredStatus('❌ Podaj nazwę użytkownika i klucz API');
-      return;
-    }
+    // Empty fields are allowed — the API falls back to server-side .env values.
     setCredState('checking');
     setCredStatus('⏳ Sprawdzam dane logowania...');
     try {

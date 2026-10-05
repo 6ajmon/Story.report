@@ -1,3 +1,10 @@
+import path from 'path';
+import dotenv from 'dotenv';
+
+// Load the repo-root .env so the server-side fallback credentials match
+// what the generator (index.js) uses. Next.js only loads web/.env* by itself.
+dotenv.config({ path: path.resolve(process.cwd(), '..', '.env') });
+
 const API_BASE_URL = 'https://ws.audioscrobbler.com/2.0';
 
 /**
