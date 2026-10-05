@@ -116,5 +116,11 @@ The web UI communicates with the generator through environment variables:
 - REPORT_ENABLE_TOP_ITEMS - Enable top items section
 - REPORT_ENABLE_WORDCLOUD - Enable word cloud
 - REPORT_TEXT_COLOR_MODE - Text color strategy (auto/light/dark)
+- REPORT_LASTFM_USERNAME - Per-run Last.fm username override (falls back to LASTFM_USERNAME)
+- REPORT_LASTFM_API_KEY - Per-run Last.fm API key override (falls back to LASTFM_API_KEY)
 
 All overrides are optional; defaults apply if not specified.
+
+The web UI exposes username + API key inputs (with a link to
+https://www.last.fm/api/account/create). `web/pages/api/validate.js` checks them
+via the Last.fm `user.getInfo` method before generation.

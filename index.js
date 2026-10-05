@@ -8,8 +8,10 @@ import { config } from './config.js';
 // Load environment variables
 dotenv.config();
 
-const API_KEY = process.env.LASTFM_API_KEY;
-const USERNAME = process.env.LASTFM_USERNAME;
+// Credentials from .env, but the web UI can override them per-run via
+// REPORT_LASTFM_API_KEY / REPORT_LASTFM_USERNAME environment variables.
+const API_KEY = process.env.REPORT_LASTFM_API_KEY || process.env.LASTFM_API_KEY;
+const USERNAME = process.env.REPORT_LASTFM_USERNAME || process.env.LASTFM_USERNAME;
 const API_BASE_URL = 'https://ws.audioscrobbler.com/2.0';
 const GENERATED_DIR = path.join(process.cwd(), 'generated');
 const GENERATED_ASSETS_DIR = path.join(GENERATED_DIR, 'assets');

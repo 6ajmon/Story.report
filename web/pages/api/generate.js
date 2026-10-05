@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { font, bg, accent, from, to, footer, forceFetch, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode } = req.body || {};
+  const { font, bg, accent, from, to, footer, forceFetch, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode, username, apiKey } = req.body || {};
 
   const cwd = path.resolve(process.cwd(), '..');
   const node = process.execPath;
@@ -32,6 +32,9 @@ export default async function handler(req, res) {
   if (enableTopItems !== undefined) env.REPORT_ENABLE_TOP_ITEMS = String(enableTopItems);
   if (enableWordCloud !== undefined) env.REPORT_ENABLE_WORDCLOUD = String(enableWordCloud);
   if (textColorMode) env.REPORT_TEXT_COLOR_MODE = textColorMode;
+  // Optional per-run Last.fm credentials coming from the web form.
+  if (username) env.REPORT_LASTFM_USERNAME = username;
+  if (apiKey) env.REPORT_LASTFM_API_KEY = apiKey;
 
   const args = [script];
   if (shouldForce) {
