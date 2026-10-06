@@ -145,6 +145,10 @@ You can also trigger the download from the web UI with the
 refreshes automatically afterwards. In Docker the fonts are downloaded during
 the image build, so nothing extra is needed at runtime.
 
+The font dropdown previews each bundled family **in its own typeface**: the
+browser loads the Google Fonts webfonts on demand (when the selector is focused),
+independent of the server-side TTFs used by Typst.
+
 Bundled families: Roboto, Open Sans, Lato, Montserrat, Poppins, Inter, Nunito,
 Raleway, Work Sans, Playfair Display, Merriweather, Lora, Source Serif 4,
 JetBrains Mono, Fira Code, Roboto Mono, Source Code Pro, IBM Plex Mono,
