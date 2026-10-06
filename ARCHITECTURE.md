@@ -16,18 +16,24 @@ The current architecture is built around a single source of truth: the scrobble 
 ```text
 story-report/
 ├── index.js
+├── Dockerfile
 ├── README.md
 ├── QUICK_START.md
 ├── ARCHITECTURE.md
 ├── FAQ.md
 ├── AGENTS.md
+├── scripts/
+│  └── fetch-fonts.js        # downloads bundled Google Fonts into fonts/
+├── fonts/                   # bundled TTFs (git-ignored)
 ├── web/
 │  ├── package.json
 │  └── pages/
 │     ├── index.js
 │     └── api/
 │        ├── generate.js
-│        ├── validate.js
+│        ├── validate.js     # validates Last.fm credentials
+│        ├── fonts.js        # lists fonts Typst can render
+│        ├── fetch-fonts.js  # triggers the Google Fonts download
 │        └── report-image.js
 └── generated/
    ├── report.typ
@@ -132,9 +138,19 @@ typst compile template.typ.example out.png
 - `REPORT_TEXT_COLOR_MODE` - Text color mode: 'auto' (default), 'light', 'dark'
 - `REPORT_LASTFM_USERNAME` - Per-run Last.fm username (falls back to `LASTFM_USERNAME`)
 - `REPORT_LASTFM_API_KEY` - Per-run Last.fm API key (falls back to `LASTFM_API_KEY`)
+- `REPORT_FONTS_DIR` - Bundled fonts directory passed to Typst via `--font-path` (default: `<repo>/fonts`)
 
 The web UI's `/api/validate` endpoint checks username + API key pairs via the
 Last.fm `user.getInfo` method before generating a report.
+
+### Fonts
+Typst renders the report server-side, so it can only use fonts present on the
+machine. `scripts/fetch-fonts.js` downloads a curated set of OFL Google Fonts
+into `fonts/` (git-ignored). `index.js` passes that directory to
+`typst compile --font-path`, and `web/pages/api/fonts.js` passes it to
+`typst fonts` so the UI only offers renderable families. The user can trigger a
+download from the UI (`⬇️ Pobierz czcionki Google` → `/api/fetch-fonts`) or via
+`npm run fonts`. The Docker build bakes the fonts into the runtime image.
 
 ## Contributing
 

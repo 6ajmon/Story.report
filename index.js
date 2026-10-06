@@ -17,6 +17,11 @@ const GENERATED_DIR = path.join(process.cwd(), 'generated');
 const GENERATED_ASSETS_DIR = path.join(GENERATED_DIR, 'assets');
 const GENERATED_JSON_FILE = path.join(GENERATED_DIR, 'report.json');
 
+// Bundled Google Fonts (see scripts/fetch-fonts.js). Passed to Typst via
+// --font-path so reports render consistently even on servers/containers that
+// ship only a couple of system fonts.
+const FONTS_DIR = process.env.REPORT_FONTS_DIR || path.join(process.cwd(), 'fonts');
+
 // CLI flags
 const FORCE_FETCH = process.argv.includes('--force');
 
@@ -299,7 +304,7 @@ function resolveTypstFontSpec(requestedFont, monoFont) {
   const normalized = fontName.toLowerCase();
 
   if (!fontName || normalized === 'default' || normalized === 'sans' || normalized === 'system') {
-    return `"${escapeTypstString('Segoe UI')}"`;
+    return formatTypstFontList(['Segoe UI', 'Roboto', 'Open Sans', 'Lato', 'Libertinus Serif']);
   }
 
   if (normalized === 'mono' || normalized === 'monospace') {
@@ -307,13 +312,25 @@ function resolveTypstFontSpec(requestedFont, monoFont) {
       monoFont || 'Consolas',
       'Cascadia Mono',
       'Courier New',
-      'DejaVu Sans Mono',
       'JetBrains Mono',
+      'Fira Code',
+      'Roboto Mono',
+      'Source Code Pro',
+      'IBM Plex Mono',
+      'DejaVu Sans Mono',
     ]);
   }
 
   if (normalized === 'serif') {
-    return formatTypstFontList(['Georgia', 'Times New Roman', 'Noto Serif']);
+    return formatTypstFontList([
+      'Georgia',
+      'Times New Roman',
+      'Playfair Display',
+      'Merriweather',
+      'Source Serif 4',
+      'Lora',
+      'Noto Serif',
+    ]);
   }
 
   if (fontName.includes(',')) {
@@ -874,6 +891,18 @@ ${footerTextSafe ? `#align(center)[
 }
 
 /**
+ * Build the --font-path argument for Typst from the bundled fonts directory.
+ * Returns an empty string when no bundled fonts are present, in which case
+ * Typst simply falls back to system + built-in fonts.
+ */
+function getTypstFontPathArgs() {
+  if (!fs.existsSync(FONTS_DIR)) {
+    return '';
+  }
+  return `--font-path "${FONTS_DIR}"`;
+}
+
+/**
  * Compile Typst template to PNG
  */
 async function compileTypstToPng(typstFilePath, outputImagePath) {
@@ -891,8 +920,13 @@ async function compileTypstToPng(typstFilePath, outputImagePath) {
       process.exit(1);
     }
 
+    const fontPathArgs = getTypstFontPathArgs();
+    if (fontPathArgs) {
+      console.log(`🔤 Using bundled fonts from ${FONTS_DIR}`);
+    }
+
     // Compile Typst to PNG (export only page 1 for Instagram Story)
-    execSync(`typst compile --pages 1 "${typstFilePath}" "${outputImagePath}"`, {
+    execSync(`typst compile --pages 1 ${fontPathArgs} "${typstFilePath}" "${outputImagePath}"`, {
       stdio: 'inherit',
     });
 

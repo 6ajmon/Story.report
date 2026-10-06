@@ -46,7 +46,20 @@ LASTFM_API_KEY=your_api_key
 LASTFM_USERNAME=your_username
 ```
 
-## 4. Generate the report
+## 4. (Optional) Bundle extra fonts
+
+Typst can only render fonts installed on the machine. On a minimal server only a
+few may be present, so Story.report can download a curated set of Google Fonts
+into a local `fonts/` directory:
+
+```bash
+npm run fonts
+```
+
+You can also click **⬇️ Pobierz czcionki Google** in the web UI. In Docker the
+fonts are downloaded automatically during the image build.
+
+## 5. Generate the report
 
 ```bash
 npm start
@@ -58,7 +71,7 @@ Or run the web UI:
 npm run web
 ```
 
-## 5. Find the output
+## 6. Find the output
 
 - image: generated/report.png
 - Typst source: generated/report.typ

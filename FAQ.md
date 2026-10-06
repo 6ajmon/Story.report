@@ -80,6 +80,13 @@ Use "Auto" mode for best contrast on custom backgrounds.
 ### How do I change the font?
 Use the web UI **Font** dropdown - it groups **40+ fonts** (Sans-serif, Serif, Monospace, Display/Decorative) plus the `Mono preset` and `Serif preset`. Only fonts Typst can actually render on your machine are shown (auto-detected via `typst fonts`); a small note under the dropdown shows the count. You can also edit `config.js` and set `typography.font` to any renderable font name; if a font is missing, the report falls back to `Segoe UI`.
 
+### Only a few fonts show up on my server. How do I get more?
+Typst can only use fonts installed on the machine. To make Story.report work everywhere, it can bundle a curated set of Google Fonts into a local `fonts/` directory and pass it to Typst with `--font-path`. Download them with either:
+- the **⬇️ Pobierz czcionki Google** button in the web UI (next to the font dropdown), or
+- `npm run fonts` on the command line (`npm run fonts -- --force` to re-download).
+
+The catalog includes Roboto, Open Sans, Montserrat, Poppins, Inter, Playfair Display, Lora, JetBrains Mono, Bebas Neue, Lobster and more (all OFL-licensed). In Docker the fonts are baked in during the image build, so no action is needed after deploy. Use `REPORT_FONTS_DIR` to point at a different directory.
+
 ### How do the image color presets work?
 In the web UI, open **Color Presets from Image** and click `Top Artist`, `Top Album`, or `Top Track`. The report downsamples the artwork, runs median-cut quantization to build a palette, then proposes two colors: a **background** (dominant color, darkened when dark) and an **accent** (most vibrant color distinct from the background). The accent is then adjusted (lightened on dark backgrounds, darkened on light ones) until it reaches a **WCAG AA contrast ratio of at least 4.5:1** against the background, so accent-colored text stays clearly readable. Both colors are applied to the form and the report regenerates automatically.
 
