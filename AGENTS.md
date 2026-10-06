@@ -135,4 +135,7 @@ via the Last.fm `user.getInfo` method before generation.
 - `web/pages/api/fonts.js` lists renderable fonts (query `?refresh=1` bypasses the cache).
 - `web/pages/api/fetch-fonts.js` triggers the download; the web UI button
   "⬇️ Pobierz czcionki Google" calls it and then refreshes the catalog.
+- The font `<select>` previews bundled families in their own typeface via a
+  Google Fonts CSS `<link>` (loaded on demand when the select is focused),
+  separate from the server-side TTFs used by Typst.
 - The Docker build downloads the fonts and bakes them into the runtime image.

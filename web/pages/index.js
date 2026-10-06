@@ -1,3 +1,4 @@
+import Head from 'next/head';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { medianCutQuantize, extractBackgroundAndAccent } from '../lib/palette';
 
@@ -106,6 +107,17 @@ const FONT_GROUPS = [
   },
 ];
 
+// Google Fonts webfonts used to render the bundled family names *in their own
+// typeface* inside the <select>. The bundled TTFs in fonts/ are only visible to
+// Typst (server-side); the browser needs the webfont versions for the preview.
+const GOOGLE_FONT_FAMILIES = (FONT_GROUPS.find((g) => g.label === 'Google Fonts (bundled)')?.options || []).map(
+  (opt) => opt.value
+);
+const GOOGLE_FONTS_HREF =
+  'https://fonts.googleapis.com/css2?' +
+  GOOGLE_FONT_FAMILIES.map((family) => `family=${family.replace(/ /g, '+')}`).join('&') +
+  '&display=swap';
+
 // CSS fallback stack used only to preview a font in the <select>.
 function fontPreviewFamily(fontName) {
   if (fontName === 'mono') return 'Consolas, monospace';
@@ -206,6 +218,19 @@ export default function Home() {
   useEffect(() => {
     loadFonts(false);
   }, [loadFonts]);
+
+  // Warm up the webfonts used to preview the bundled families. Called on the
+  // first interaction with the font <select> so the dropdown items are drawn in
+  // their own typeface as soon as the popup opens (instead of on page load).
+  const fontPreviewWarmedRef = useRef(false);
+  function warmUpFontPreviews() {
+    if (fontPreviewWarmedRef.current) return;
+    fontPreviewWarmedRef.current = true;
+    if (typeof document === 'undefined' || !document.fonts) return;
+    GOOGLE_FONT_FAMILIES.forEach((family) => {
+      document.fonts.load(`16px "${family}"`).catch(() => {});
+    });
+  }
 
   // Download the bundled Google Fonts, then refresh the catalog.
   async function fetchGoogleFonts() {
@@ -508,6 +533,12 @@ export default function Home() {
 
   return (
     <div style={containerStyle}>
+      <Head>
+        <title>Story.report</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="stylesheet" href={GOOGLE_FONTS_HREF} />
+      </Head>
       <div style={formContainerStyle}>
         <h1 style={{ marginTop: 0, marginBottom: '16px', fontSize: '28px', fontWeight: '600' }}>
           📊 Story.report
@@ -595,6 +626,8 @@ export default function Home() {
             <select
               value={font}
               onChange={(e) => setFont(e.target.value)}
+              onMouseDown={warmUpFontPreviews}
+              onFocus={warmUpFontPreviews}
               style={{
                 ...selectStyle,
                 fontFamily: fontPreviewFamily(font),
