@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { font, bg, accent, from, to, footer, forceFetch, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode, username, apiKey } = req.body || {};
+  const { font, fontSecondary, bg, accent, from, to, footer, forceFetch, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode, username, apiKey } = req.body || {};
 
   const cwd = path.resolve(process.cwd(), '..');
   const node = process.execPath;
@@ -21,6 +21,7 @@ export default async function handler(req, res) {
 
   const env = Object.assign({}, process.env);
   if (font) env.REPORT_FONT = font;
+  if (fontSecondary) env.REPORT_FONT_SECONDARY = fontSecondary;
   if (bg) env.REPORT_BG = bg;
   if (accent) env.REPORT_ACCENT = accent;
   if (footer) env.REPORT_FOOTER_TEXT = footer;

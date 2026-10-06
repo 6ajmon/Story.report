@@ -105,7 +105,8 @@ If adding methods, keep rate-limit-friendly usage and clear fallback handling.
 
 The web UI communicates with the generator through environment variables:
 
-- REPORT_FONT - Font family selection
+- REPORT_FONT - Font family selection (primary)
+- REPORT_FONT_SECONDARY - Secondary font for labels/captions (falls back to the primary font when empty)
 - REPORT_BG - Background color hex
 - REPORT_ACCENT - Accent color hex
 - REPORT_FOOTER_TEXT - Custom footer (empty = no footer)
@@ -128,13 +129,20 @@ via the Last.fm `user.getInfo` method before generation.
 
 ## Fonts
 
-- Bundled Google Fonts (OFL) live in `fonts/` (git-ignored) and are downloaded by
+- The report uses two fonts: `primary` (base text) and `secondary` (labels,
+  captions, footer). `secondary` defaults to `primary` (single-font report).
+- `index.js` emits `#let font-secondary = ...` and applies it via `font: font-secondary`
+  on the supporting text elements. Set it with `REPORT_FONT_SECONDARY` or
+  `config.typography.fontSecondary`.
+- Bundled fonts live in `fonts/` (git-ignored) and are downloaded by
   `scripts/fetch-fonts.js` (`npm run fonts`, add `-- --force` to re-download).
+  This includes the Google Fonts catalogue **and** the Font Awesome Free desktop
+  fonts required by the Typst `fontawesome` package (report icons).
 - `index.js` passes the fonts directory to Typst with `--font-path`; the directory
   defaults to `<repo>/fonts` and can be changed with `REPORT_FONTS_DIR`.
 - `web/pages/api/fonts.js` lists renderable fonts (query `?refresh=1` bypasses the cache).
 - `web/pages/api/fetch-fonts.js` triggers the download; the web UI button
-  "⬇️ Pobierz czcionki Google" calls it and then refreshes the catalog.
+  "⬇️ Download Google Fonts" calls it and then refreshes the catalog.
 - The font `<select>` previews bundled families in their own typeface via a
   Google Fonts CSS `<link>` (loaded on demand when the select is focused),
   separate from the server-side TTFs used by Typst.
