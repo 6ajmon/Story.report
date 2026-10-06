@@ -35,6 +35,8 @@ RUN npm --prefix web ci
 FROM deps AS build
 COPY . .
 RUN npm --prefix web run build
+# Bundle Google Fonts so Typst can render a rich catalog without system fonts.
+RUN node scripts/fetch-fonts.js
 
 # --- runtime ---
 FROM base AS runtime
@@ -49,6 +51,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/web/node_modules ./web/node_modules
 COPY . .
 COPY --from=build /app/web/.next ./web/.next
+COPY --from=build /app/fonts ./fonts
 RUN mkdir -p /app/generated/assets && chown -R node:node /app
 USER node
 EXPOSE 3000

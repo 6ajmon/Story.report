@@ -16,6 +16,7 @@ Instagram Story report generator (1080x1920) built from Last.fm listening data, 
 - ✅ **Smart Image Fallbacks** - Multi-level fallback chain for artist/album/track images
 - ✅ **Intelligent Caching** - Caches Last.fm API responses, reuses on config changes
 - ✅ **Expanded Font Catalog** - 40+ grouped fonts (sans-serif, serif, mono, decorative) with live preview, auto-filtered to only fonts Typst can render on the machine
+- ✅ **Bundled Google Fonts** - Download a curated OFL font set into `fonts/` (CLI or one UI button) so servers/containers with few system fonts still get a rich catalog
 - ✅ **Image Color Presets** - One-click background + accent extraction from the Top Artist, Top Album, or Top Track artwork (median-cut quantization), with WCAG contrast enforcement so accent text stays readable
 - ✅ **No Avatar** - Lightweight, clean design without user avatar
 
@@ -53,6 +54,7 @@ Then open [http://localhost:3000](http://localhost:3000) to configure and previe
 ```text
 story-report/
 ├── index.js
+├── Dockerfile
 ├── README.md
 ├── QUICK_START.md
 ├── ARCHITECTURE.md
@@ -60,6 +62,9 @@ story-report/
 ├── AGENTS.md
 ├── .gitignore
 ├── package.json
+├── scripts/
+│  └── fetch-fonts.js         # downloads bundled Google Fonts into fonts/
+├── fonts/                    # bundled TTFs (git-ignored, `npm run fonts`)
 ├── web/
 │  ├── package.json
 │  ├── lib/
@@ -68,6 +73,9 @@ story-report/
 │     ├── index.js
 │     └── api/
 │        ├── generate.js
+│        ├── validate.js      # validates Last.fm username + API key
+│        ├── fonts.js         # lists fonts Typst can render
+│        ├── fetch-fonts.js   # triggers the Google Fonts download
 │        ├── report-image.js
 │        ├── report-assets.js # serves generated/assets for the UI
 │        └── report-images.js # lists top artist/album/track images
@@ -80,7 +88,7 @@ story-report/
       └── track.*
 ```
 
-Note: the generated directory is ignored by git.
+Note: the generated directory and the bundled `fonts/` directory are ignored by git.
 
 ## Output
 
@@ -96,7 +104,7 @@ Note: the generated directory is ignored by git.
 The web UI provides real-time controls for:
 
 - **Last.fm Credentials** - Optional username + API key fields (with a **🔍 Sprawdź i pobierz** button that validates them against the Last.fm API). Leave empty to use `LASTFM_USERNAME` / `LASTFM_API_KEY` from `.env`. Get a key at [last.fm/api/account/create](https://www.last.fm/api/account/create).
-- **Font** - 8 font presets displayed in their own fonts
+- **Font** - Choose from bundled Google Fonts + system fonts. Only fonts Typst can actually render are offered; use **⬇️ Pobierz czcionki Google** to download the bundled catalog on servers with few system fonts.
 - **Background Color** - Custom hex color for page background
 - **Accent Color** - Custom hex color for highlights and text
 - **Date Range** - Override the default previous month (ISO format: YYYY-MM-DD)
@@ -110,17 +118,41 @@ The web UI provides real-time controls for:
 - **Footer Text** - Custom footer or leave empty to hide
 
 ### Change font
-Use the web UI font presets, or edit [config.js](config.js) if you want to change the default font family:
+Use the web UI font dropdown, or edit [config.js](config.js) to change the default font family:
 
 ```javascript
 typography: {
-  font: 'Segoe UI',       // Change to 'Courier New', 'IBM Plex Mono', 'JetBrains Mono' for monospace
+  font: 'Segoe UI',        // any family name (see below)
   monoFont: 'Courier New', // Fallback monospace font
   ...
 }
 ```
 
-Common monospace fonts:
+#### Bundled Google Fonts
+Typst renders the report server-side, so it can only use fonts that exist on the
+machine. On a minimal server/container that often means only a couple of system
+fonts are available. To fix this, Story.report can bundle a curated set of
+[Google Fonts](https://fonts.google.com/) (all OFL-licensed) into a local
+`fonts/` directory and pass it to Typst via `--font-path`:
+
+```bash
+npm run fonts            # download missing fonts into ./fonts (idempotent)
+npm run fonts -- --force # re-download everything
+```
+
+You can also trigger the download from the web UI with the
+**⬇️ Pobierz czcionki Google** button (next to the font selector); the catalog
+refreshes automatically afterwards. In Docker the fonts are downloaded during
+the image build, so nothing extra is needed at runtime.
+
+Bundled families: Roboto, Open Sans, Lato, Montserrat, Poppins, Inter, Nunito,
+Raleway, Work Sans, Playfair Display, Merriweather, Lora, Source Serif 4,
+JetBrains Mono, Fira Code, Roboto Mono, Source Code Pro, IBM Plex Mono,
+Bebas Neue, Lobster, Pacifico, Anton.
+
+Set `REPORT_FONTS_DIR` to use a different bundled-fonts directory.
+
+Common system monospace fonts (used as fallbacks):
 - `Consolas` (default monospace fallback on Windows)
 - `Courier New`
 - `JetBrains Mono`

@@ -9,6 +9,7 @@
     "start force": "node index.js --force",
     "dev": "node index.js",
     "web": "cd web && npm run dev",
+    "fonts": "node scripts/fetch-fonts.js",
     "example": "node example.js"
   },
   "keywords": [

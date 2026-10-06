@@ -19,6 +19,9 @@ album.jpg
 track.png
 track.jpg
 
+# Bundled Google Fonts (download with: npm run fonts)
+fonts/
+
 # Logs and local debug output
 logs/
 *.log

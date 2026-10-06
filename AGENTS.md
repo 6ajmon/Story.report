@@ -118,9 +118,21 @@ The web UI communicates with the generator through environment variables:
 - REPORT_TEXT_COLOR_MODE - Text color strategy (auto/light/dark)
 - REPORT_LASTFM_USERNAME - Per-run Last.fm username override (falls back to LASTFM_USERNAME)
 - REPORT_LASTFM_API_KEY - Per-run Last.fm API key override (falls back to LASTFM_API_KEY)
+- REPORT_FONTS_DIR - Directory with bundled fonts passed to Typst via --font-path (default: <repo>/fonts)
 
 All overrides are optional; defaults apply if not specified.
 
 The web UI exposes username + API key inputs (with a link to
 https://www.last.fm/api/account/create). `web/pages/api/validate.js` checks them
 via the Last.fm `user.getInfo` method before generation.
+
+## Fonts
+
+- Bundled Google Fonts (OFL) live in `fonts/` (git-ignored) and are downloaded by
+  `scripts/fetch-fonts.js` (`npm run fonts`, add `-- --force` to re-download).
+- `index.js` passes the fonts directory to Typst with `--font-path`; the directory
+  defaults to `<repo>/fonts` and can be changed with `REPORT_FONTS_DIR`.
+- `web/pages/api/fonts.js` lists renderable fonts (query `?refresh=1` bypasses the cache).
+- `web/pages/api/fetch-fonts.js` triggers the download; the web UI button
+  "⬇️ Pobierz czcionki Google" calls it and then refreshes the catalog.
+- The Docker build downloads the fonts and bakes them into the runtime image.

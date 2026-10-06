@@ -1,9 +1,40 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { medianCutQuantize, extractBackgroundAndAccent } from '../lib/palette';
 
 // Expanded font catalog (grouped). Values are real Windows/system font names
 // passed straight to the generator; Typst falls back to Segoe UI if missing.
+//
+// The "Google Fonts" group is bundled on disk via `scripts/fetch-fonts.js`
+// (npm run fonts) and passed to Typst with --font-path, so these families work
+// even on a server that has only a handful of system fonts installed.
 const FONT_GROUPS = [
+  {
+    label: 'Google Fonts (bundled)',
+    options: [
+      { value: 'Roboto', label: 'Roboto' },
+      { value: 'Open Sans', label: 'Open Sans' },
+      { value: 'Lato', label: 'Lato' },
+      { value: 'Montserrat', label: 'Montserrat' },
+      { value: 'Poppins', label: 'Poppins' },
+      { value: 'Inter', label: 'Inter' },
+      { value: 'Nunito', label: 'Nunito' },
+      { value: 'Raleway', label: 'Raleway' },
+      { value: 'Work Sans', label: 'Work Sans' },
+      { value: 'Playfair Display', label: 'Playfair Display' },
+      { value: 'Merriweather', label: 'Merriweather' },
+      { value: 'Lora', label: 'Lora' },
+      { value: 'Source Serif 4', label: 'Source Serif 4' },
+      { value: 'JetBrains Mono', label: 'JetBrains Mono' },
+      { value: 'Fira Code', label: 'Fira Code' },
+      { value: 'Roboto Mono', label: 'Roboto Mono' },
+      { value: 'Source Code Pro', label: 'Source Code Pro' },
+      { value: 'IBM Plex Mono', label: 'IBM Plex Mono' },
+      { value: 'Bebas Neue', label: 'Bebas Neue' },
+      { value: 'Lobster', label: 'Lobster' },
+      { value: 'Pacifico', label: 'Pacifico' },
+      { value: 'Anton', label: 'Anton' },
+    ],
+  },
   {
     label: 'Presets',
     options: [
@@ -92,6 +123,20 @@ function isTypstFontAvailable(fontValue, typstFaces) {
   });
 }
 
+// Preferred default font, in order. Falls back to the first available one so
+// the app still looks right on servers without Segoe UI.
+const DEFAULT_FONT_PREFERENCE = ['Segoe UI', 'Roboto', 'Open Sans', 'Lato', 'Inter'];
+
+function pickDefaultFont(typstFaces) {
+  for (const font of DEFAULT_FONT_PREFERENCE) {
+    if (isTypstFontAvailable(font, typstFaces)) return font;
+  }
+  const firstCatalogFont = FONT_GROUPS.flatMap((g) => g.options).find((opt) =>
+    isTypstFontAvailable(opt.value, typstFaces)
+  );
+  return firstCatalogFont ? firstCatalogFont.value : 'Segoe UI';
+}
+
 export default function Home() {
   const [font, setFont] = useState('Segoe UI');
   const [bg, setBg] = useState('#0f0f0f');
@@ -112,6 +157,8 @@ export default function Home() {
   const [credState, setCredState] = useState('idle'); // idle | checking | ok | error
   const [credStatus, setCredStatus] = useState('');
   const [typstFaces, setTypstFaces] = useState(null); // null = not checked yet
+  const [fontFetching, setFontFetching] = useState(false);
+  const [fontFetchStatus, setFontFetchStatus] = useState('');
   const [status, setStatus] = useState('');
   const [imageUrl, setImageUrl] = useState(null);
   const [imageVersion, setImageVersion] = useState(0);
@@ -138,25 +185,53 @@ export default function Home() {
   }, [font, bg, accent, from, to, footer, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode]);
 
   // Load the list of fonts Typst can render and hide unavailable ones.
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/fonts')
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        const faces = data && data.ok ? data.fonts : null;
-        setTypstFaces(faces);
-        if (faces) {
-          setFont((current) => (isTypstFontAvailable(current, faces) ? current : 'Segoe UI'));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setTypstFaces(null);
-      });
-    return () => {
-      cancelled = true;
-    };
+  const loadFonts = useCallback(async (refresh = false) => {
+    try {
+      const resp = await fetch(`/api/fonts${refresh ? '?refresh=1' : ''}`);
+      const data = await resp.json();
+      const faces = data && data.ok ? data.fonts : null;
+      setTypstFaces(faces);
+      if (faces) {
+        setFont((current) =>
+          isTypstFontAvailable(current, faces) ? current : pickDefaultFont(faces)
+        );
+      }
+      return faces;
+    } catch {
+      setTypstFaces(null);
+      return null;
+    }
   }, []);
+
+  useEffect(() => {
+    loadFonts(false);
+  }, [loadFonts]);
+
+  // Download the bundled Google Fonts, then refresh the catalog.
+  async function fetchGoogleFonts() {
+    if (fontFetching) return;
+    setFontFetching(true);
+    setFontFetchStatus('⏳ Pobieram czcionki Google...');
+    try {
+      const resp = await fetch('/api/fetch-fonts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        const faces = await loadFonts(true);
+        setFontFetchStatus(`✅ Gotowe — dostępnych czcionek: ${faces ? faces.length : 0}`);
+        setTimeout(() => setFontFetchStatus(''), 4000);
+      } else {
+        setFontFetchStatus('❌ ' + (data.error || 'Nie udało się pobrać czcionek'));
+      }
+    } catch (err) {
+      setFontFetchStatus('❌ ' + err.message);
+    } finally {
+      setFontFetching(false);
+    }
+  }
 
   // Catalog fonts filtered to what Typst can actually render on this machine.
   const visibleFontGroups = useMemo(() => {
@@ -544,6 +619,20 @@ export default function Home() {
                 {availableFontCount} of {allCatalogOptions.length} fonts are renderable by Typst on this machine
               </span>
             )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={fetchGoogleFonts}
+                style={{ ...buttonSecondaryStyle, fontSize: '12px', padding: '6px 10px' }}
+                disabled={fontFetching}
+                title="Pobiera czcionki Google do katalogu fonts/ (bez instalacji w systemie)"
+              >
+                {fontFetching ? '⏳ Pobieram...' : '⬇️ Pobierz czcionki Google'}
+              </button>
+              {fontFetchStatus && (
+                <span style={{ color: '#888', fontSize: '12px', fontWeight: '400' }}>{fontFetchStatus}</span>
+              )}
+            </div>
           </label>
 
           {/* Background color */}
