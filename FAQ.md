@@ -54,6 +54,15 @@ Then open the local Next.js app in the browser.
 ### Where does the preview image come from?
 The image preview is streamed from `/api/report-image` inside the Next.js app and points to `generated/report.png`.
 
+### Where are my Last.fm username and API key stored?
+Only in your browser, and only if **Remember in this browser** is ticked — they are saved in `localStorage` under `storyreport.lastfm-creds` so you don't have to retype them. Untick the box to erase them. They are never persisted on the server; leaving the fields empty makes the generator fall back to `LASTFM_USERNAME` / `LASTFM_API_KEY` from `.env`.
+
+### How do I copy or download the finished image?
+In the **Preview** panel use **📋 Copy** to copy the PNG to the clipboard or **⬇️ Download** to download it. Both buttons become active as soon as a report has been generated. Copying an image requires a secure context (HTTPS or `localhost`) — on plain HTTP over a LAN IP use **Download** instead.
+
+### How do I export a custom date range?
+The report covers the previous full calendar month by default. Tick **Custom date range** to reveal the `Date From` / `Date To` inputs.
+
 ## Customization
 
 ### Which modules can I disable?
@@ -80,9 +89,12 @@ Use "Auto" mode for best contrast on custom backgrounds.
 ### How do I change the font?
 Use the web UI **Font** dropdown - it groups **40+ fonts** (Sans-serif, Serif, Monospace, Display/Decorative) plus the `Mono preset` and `Serif preset`. Only fonts Typst can actually render on your machine are shown (auto-detected via `typst fonts`); a small note under the dropdown shows the count. You can also edit `config.js` and set `typography.font` to any renderable font name; if a font is missing, the report falls back to `Segoe UI`.
 
+### Can I use two different fonts?
+Yes. The **Primary Font** is used for the base text (big numbers, top item names, word cloud). Tick **different from primary** next to **Secondary Font** to pick a different family for labels and captions (header, `scrobbles`, `N artists/albums/tracks`, `Top artist/album/track`, playcount sublines, `Top tags`, footer). By default the secondary font is the same as the primary, i.e. the classic single-font report. On the CLI it maps to `REPORT_FONT` and `REPORT_FONT_SECONDARY` (or `config.typography.fontSecondary`).
+
 ### Only a few fonts show up on my server. How do I get more?
 Typst can only use fonts installed on the machine. To make Story.report work everywhere, it can bundle a curated set of Google Fonts into a local `fonts/` directory and pass it to Typst with `--font-path`. Download them with either:
-- the **⬇️ Pobierz czcionki Google** button in the web UI (next to the font dropdown), or
+- the **⬇️ Download Google Fonts** button in the web UI (next to the font dropdown), or
 - `npm run fonts` on the command line (`npm run fonts -- --force` to re-download).
 
 The catalog includes Roboto, Open Sans, Montserrat, Poppins, Inter, Playfair Display, Lora, JetBrains Mono, Bebas Neue, Lobster and more (all OFL-licensed). In Docker the fonts are baked in during the image build, so no action is needed after deploy. Use `REPORT_FONTS_DIR` to point at a different directory.

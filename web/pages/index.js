@@ -118,6 +118,9 @@ const GOOGLE_FONTS_HREF =
   GOOGLE_FONT_FAMILIES.map((family) => `family=${family.replace(/ /g, '+')}`).join('&') +
   '&display=swap';
 
+// localStorage key for remembered Last.fm credentials (browser-only).
+const CREDS_STORAGE_KEY = 'storyreport.lastfm-creds';
+
 // CSS fallback stack used only to preview a font in the <select>.
 function fontPreviewFamily(fontName) {
   if (fontName === 'mono') return 'Consolas, monospace';
@@ -151,6 +154,11 @@ function pickDefaultFont(typstFaces) {
 
 export default function Home() {
   const [font, setFont] = useState('Segoe UI');
+  const [fontSecondary, setFontSecondary] = useState('Segoe UI');
+  const [useSecondaryFont, setUseSecondaryFont] = useState(false);
+  const [customDateRange, setCustomDateRange] = useState(false);
+  const [rememberCreds, setRememberCreds] = useState(true);
+  const [copyStatus, setCopyStatus] = useState('');
   const [bg, setBg] = useState('#0f0f0f');
   const [accent, setAccent] = useState('#e8d5a3');
   const [from, setFrom] = useState('');
@@ -194,7 +202,36 @@ export default function Home() {
         clearTimeout(autoGenerateTimeoutRef.current);
       }
     };
-  }, [font, bg, accent, from, to, footer, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode]);
+  }, [font, fontSecondary, useSecondaryFont, customDateRange, bg, accent, from, to, footer, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode]);
+
+  // Restore remembered Last.fm credentials (localStorage is browser-only).
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(CREDS_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved && typeof saved.username === 'string') setUsername(saved.username);
+      if (saved && typeof saved.apiKey === 'string') setApiKey(saved.apiKey);
+    } catch {
+      // ignore malformed / unavailable storage
+    }
+  }, []);
+
+  // Persist credentials while "remember" is on; clear them when it is turned off.
+  useEffect(() => {
+    try {
+      if (!rememberCreds) {
+        window.localStorage.removeItem(CREDS_STORAGE_KEY);
+      } else if (username || apiKey) {
+        window.localStorage.setItem(CREDS_STORAGE_KEY, JSON.stringify({ username, apiKey }));
+      }
+    } catch {
+      // storage may be unavailable (e.g. private mode)
+    }
+  }, [username, apiKey, rememberCreds]);
+
+  // Secondary font falls back to the primary one when the option is off.
+  const effectiveSecondaryFont = useSecondaryFont ? fontSecondary : font;
 
   // Load the list of fonts Typst can render and hide unavailable ones.
   const loadFonts = useCallback(async (refresh = false) => {
@@ -205,6 +242,9 @@ export default function Home() {
       setTypstFaces(faces);
       if (faces) {
         setFont((current) =>
+          isTypstFontAvailable(current, faces) ? current : pickDefaultFont(faces)
+        );
+        setFontSecondary((current) =>
           isTypstFontAvailable(current, faces) ? current : pickDefaultFont(faces)
         );
       }
@@ -236,7 +276,7 @@ export default function Home() {
   async function fetchGoogleFonts() {
     if (fontFetching) return;
     setFontFetching(true);
-    setFontFetchStatus('⏳ Pobieram czcionki Google...');
+    setFontFetchStatus('⏳ Downloading Google Fonts…');
     try {
       const resp = await fetch('/api/fetch-fonts', {
         method: 'POST',
@@ -246,10 +286,10 @@ export default function Home() {
       const data = await resp.json();
       if (data.ok) {
         const faces = await loadFonts(true);
-        setFontFetchStatus(`✅ Gotowe — dostępnych czcionek: ${faces ? faces.length : 0}`);
+        setFontFetchStatus(`✅ Done — ${faces ? faces.length : 0} fonts available`);
         setTimeout(() => setFontFetchStatus(''), 4000);
       } else {
-        setFontFetchStatus('❌ ' + (data.error || 'Nie udało się pobrać czcionek'));
+        setFontFetchStatus('❌ ' + (data.error || 'Could not download fonts'));
       }
     } catch (err) {
       setFontFetchStatus('❌ ' + err.message);
@@ -277,7 +317,7 @@ export default function Home() {
     const key = apiKey.trim();
     // Empty fields are allowed — the API falls back to server-side .env values.
     setCredState('checking');
-    setCredStatus('⏳ Sprawdzam dane logowania...');
+    setCredStatus('⏳ Checking credentials…');
     try {
       const resp = await fetch('/api/validate', {
         method: 'POST',
@@ -288,13 +328,13 @@ export default function Home() {
       if (data.ok) {
         setCredState('ok');
         setCredStatus(
-          `✅ Dane poprawne: ${data.user.username} — ${data.user.playcount.toLocaleString('pl-PL')} scrobble'i`
+          `✅ Valid: ${data.user.username} — ${data.user.playcount.toLocaleString('en-US')} scrobbles`
         );
         // Credentials verified — regenerate using them right away.
         generateReport(true);
       } else {
         setCredState('error');
-        setCredStatus('❌ ' + (data.error || 'Nieprawidłowe dane logowania'));
+        setCredStatus('❌ ' + (data.error || 'Invalid credentials'));
       }
     } catch (err) {
       setCredState('error');
@@ -310,7 +350,26 @@ export default function Home() {
       const resp = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ font, bg, accent, from, to, footer, forceFetch, mosaicArtistCount, enableMosaic, enableStatistics, enableTopItems, enableWordCloud, textColorMode, username: username.trim(), apiKey: apiKey.trim() }),
+        body: JSON.stringify({
+          font,
+          fontSecondary: effectiveSecondaryFont,
+          bg,
+          accent,
+          // Only send a custom range when the user enabled it; otherwise the
+          // generator uses the previous full calendar month.
+          from: customDateRange ? from : '',
+          to: customDateRange ? to : '',
+          footer,
+          forceFetch,
+          mosaicArtistCount,
+          enableMosaic,
+          enableStatistics,
+          enableTopItems,
+          enableWordCloud,
+          textColorMode,
+          username: username.trim(),
+          apiKey: apiKey.trim(),
+        }),
       });
       const data = await resp.json();
       if (data.ok) {
@@ -327,6 +386,52 @@ export default function Home() {
       setStatus('❌ Error: ' + err.message);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  // ---- Preview actions (copy / download) ----
+
+  async function fetchReportBlob() {
+    const resp = await fetch(imageUrl);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.blob();
+  }
+
+  async function downloadReportImage() {
+    if (!imageUrl) return;
+    try {
+      const blob = await fetchReportBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `story-report-${new Date().toISOString().slice(0, 10)}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setCopyStatus('✅ PNG downloaded');
+    } catch (err) {
+      setCopyStatus('❌ ' + err.message);
+    } finally {
+      setTimeout(() => setCopyStatus(''), 4000);
+    }
+  }
+
+  async function copyReportImage() {
+    if (!imageUrl) return;
+    // The async clipboard image API needs a secure context (HTTPS or localhost).
+    if (typeof navigator === 'undefined' || !navigator.clipboard || typeof ClipboardItem === 'undefined') {
+      setCopyStatus('❌ Copying an image requires HTTPS or localhost — use "Download" instead.');
+      return;
+    }
+    try {
+      const blob = await fetchReportBlob();
+      await navigator.clipboard.write([new ClipboardItem({ [blob.type || 'image/png']: blob })]);
+      setCopyStatus('✅ Skopiowano obraz do schowka');
+    } catch (err) {
+      setCopyStatus('❌ ' + err.message);
+    } finally {
+      setTimeout(() => setCopyStatus(''), 4000);
     }
   }
 
@@ -389,6 +494,18 @@ export default function Home() {
       setStatus('❌ ' + err.message);
     }
   }
+
+  // Shared <option> list for both font selects (each label previewed in its face).
+  const renderFontOptions = () =>
+    visibleFontGroups.map((group) => (
+      <optgroup key={group.label} label={group.label}>
+        {group.options.map((opt) => (
+          <option key={opt.value} value={opt.value} style={{ fontFamily: fontPreviewFamily(opt.value) }}>
+            {opt.label}
+          </option>
+        ))}
+      </optgroup>
+    ));
 
   const containerStyle = {
     display: 'grid',
@@ -556,7 +673,7 @@ export default function Home() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 style={inputStyle}
-                placeholder="np. uzytkownik"
+                placeholder="e.g. your_username"
                 autoComplete="off"
                 spellCheck={false}
               />
@@ -571,7 +688,7 @@ export default function Home() {
                   rel="noopener noreferrer"
                   style={linkStyle}
                 >
-                  Zdobądź klucz API ↗
+                  Get an API key ↗
                 </a>
               </span>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -580,7 +697,7 @@ export default function Home() {
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   style={{ ...inputStyle, flex: 1, fontFamily: showApiKey ? "'Consolas', monospace" : 'inherit' }}
-                  placeholder="32-znakowy klucz z last.fm/api"
+                  placeholder="32-character key from last.fm/api"
                   autoComplete="off"
                   spellCheck={false}
                 />
@@ -597,7 +714,7 @@ export default function Home() {
                     fontSize: '12px',
                     fontWeight: '600',
                   }}
-                  title={showApiKey ? 'Ukryj klucz' : 'Pokaż klucz'}
+                  title={showApiKey ? 'Hide key' : 'Show key'}
                 >
                   {showApiKey ? '🙈' : '👁'}
                 </button>
@@ -610,19 +727,31 @@ export default function Home() {
               style={buttonStyle}
               disabled={credState === 'checking' || isLoading}
             >
-              🔍 Sprawdź i pobierz
+              🔍 Check & Generate
             </button>
 
             {credStatus && <div style={credStatusStyle}>{credStatus}</div>}
 
+            <label style={{ ...labelStyle, flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="checkbox"
+                checked={rememberCreds}
+                onChange={(e) => setRememberCreds(e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <span style={{ ...labelTextStyle, textTransform: 'none', letterSpacing: '0', fontSize: '12px' }}>
+                Remember in this browser
+              </span>
+            </label>
+
             <span style={{ color: '#777', fontSize: '12px', fontWeight: '400', textTransform: 'none', letterSpacing: '0' }}>
-              Pola są opcjonalne — pozostaw puste, aby użyć danych z pliku <code>.env</code>.
+              These fields are optional — leave them empty to use <code>.env</code>.
             </span>
           </div>
 
-          {/* Font selection with font preview */}
+          {/* Primary font */}
           <label style={labelStyle}>
-            <span style={labelTextStyle}>Font</span>
+            <span style={labelTextStyle}>Primary Font</span>
             <select
               value={font}
               onChange={(e) => setFont(e.target.value)}
@@ -633,40 +762,67 @@ export default function Home() {
                 fontFamily: fontPreviewFamily(font),
               }}
             >
-              {visibleFontGroups.map((group) => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.options.map((opt) => (
-                    <option
-                      key={opt.value}
-                      value={opt.value}
-                      style={{ fontFamily: fontPreviewFamily(opt.value) }}
-                    >
-                      {opt.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
+              {renderFontOptions()}
             </select>
+          </label>
+
+          {/* Secondary font (defaults to the primary one) */}
+          <label style={labelStyle}>
+            <span style={{ ...labelTextStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <span>Secondary Font</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'none', letterSpacing: '0', fontSize: '12px', color: '#888', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={useSecondaryFont}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setUseSecondaryFont(on);
+                    if (on) setFontSecondary(font);
+                  }}
+                  style={{ width: '14px', height: '14px', cursor: 'pointer' }}
+                />
+                different from primary
+              </span>
+            </span>
+            <select
+              value={effectiveSecondaryFont}
+              onChange={(e) => setFontSecondary(e.target.value)}
+              disabled={!useSecondaryFont}
+              onMouseDown={warmUpFontPreviews}
+              onFocus={warmUpFontPreviews}
+              style={{
+                ...selectStyle,
+                fontFamily: fontPreviewFamily(effectiveSecondaryFont),
+                opacity: useSecondaryFont ? 1 : 0.55,
+                cursor: useSecondaryFont ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {renderFontOptions()}
+            </select>
+          </label>
+
+          {/* Font availability + Google Fonts download */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {availableFontCount != null && (
-              <span style={{ color: '#888', fontSize: '12px', fontWeight: '400', textTransform: 'none', letterSpacing: '0' }}>
+              <span style={{ color: '#888', fontSize: '12px', fontWeight: '400' }}>
                 {availableFontCount} of {allCatalogOptions.length} fonts are renderable by Typst on this machine
               </span>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={fetchGoogleFonts}
                 style={{ ...buttonSecondaryStyle, fontSize: '12px', padding: '6px 10px' }}
                 disabled={fontFetching}
-                title="Pobiera czcionki Google do katalogu fonts/ (bez instalacji w systemie)"
+                title="Download the bundled Google Fonts into fonts/ (no system installation needed)"
               >
-                {fontFetching ? '⏳ Pobieram...' : '⬇️ Pobierz czcionki Google'}
+                {fontFetching ? '⏳ Downloading…' : '⬇️ Download Google Fonts'}
               </button>
               {fontFetchStatus && (
                 <span style={{ color: '#888', fontSize: '12px', fontWeight: '400' }}>{fontFetchStatus}</span>
               )}
             </div>
-          </label>
+          </div>
 
           {/* Background color */}
           <label style={labelStyle}>
@@ -696,16 +852,33 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Date range */}
-          <label style={labelStyle}>
-            <span style={labelTextStyle}>Date From</span>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inputStyle} />
-          </label>
-
-          <label style={labelStyle}>
-            <span style={labelTextStyle}>Date To</span>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={inputStyle} />
-          </label>
+          {/* Date range (hidden behind a toggle; default is the previous month) */}
+          <div style={{ borderTop: '1px solid #333', paddingTop: '12px', marginTop: '12px' }}>
+            <label style={{ ...labelStyle, flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="checkbox"
+                checked={customDateRange}
+                onChange={(e) => setCustomDateRange(e.target.checked)}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <span style={{ ...labelTextStyle, textTransform: 'none', fontSize: '14px' }}>Custom date range</span>
+            </label>
+            <span style={{ color: '#777', fontSize: '12px', fontWeight: '400', display: 'block', marginTop: '6px' }}>
+              {customDateRange ? 'Pick a range below.' : 'Default: previous full calendar month.'}
+            </span>
+            {customDateRange && (
+              <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                <label style={{ ...labelStyle, flex: 1 }}>
+                  <span style={{ ...labelTextStyle, textTransform: 'none', letterSpacing: '0' }}>Date From</span>
+                  <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inputStyle} />
+                </label>
+                <label style={{ ...labelStyle, flex: 1 }}>
+                  <span style={{ ...labelTextStyle, textTransform: 'none', letterSpacing: '0' }}>Date To</span>
+                  <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={inputStyle} />
+                </label>
+              </div>
+            )}
+          </div>
 
           {/* Mosaic artist count */}
           <label style={labelStyle}>
@@ -820,11 +993,48 @@ export default function Home() {
 
       {/* Preview panel (right side, 50% width) */}
       <div style={previewContainerStyle}>
-        <div>
-          <h2 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Preview
           </h2>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={copyReportImage}
+              disabled={!imageUrl || isLoading}
+              title={imageUrl ? 'Copy image to clipboard' : 'Generate an image first'}
+              style={{
+                ...buttonSecondaryStyle,
+                fontSize: '13px',
+                padding: '8px 12px',
+                opacity: imageUrl && !isLoading ? 1 : 0.5,
+                cursor: imageUrl && !isLoading ? 'pointer' : 'not-allowed',
+              }}
+            >
+              📋 Copy
+            </button>
+            <button
+              type="button"
+              onClick={downloadReportImage}
+              disabled={!imageUrl || isLoading}
+              title={imageUrl ? 'Download image (PNG)' : 'Generate an image first'}
+              style={{
+                ...buttonStyle,
+                fontSize: '13px',
+                padding: '8px 12px',
+                opacity: imageUrl && !isLoading ? 1 : 0.5,
+                cursor: imageUrl && !isLoading ? 'pointer' : 'not-allowed',
+              }}
+            >
+              ⬇️ Download
+            </button>
+          </div>
         </div>
+        {copyStatus && (
+          <div style={{ fontSize: '13px', fontWeight: '500', color: copyStatus.startsWith('❌') ? '#ff6b6b' : '#a8d5ba' }}>
+            {copyStatus}
+          </div>
+        )}
         <div style={previewBoxStyle}>
           {imageUrl ? (
             <img key={imageVersion} src={imageUrl} alt="report" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: '6px' }} />

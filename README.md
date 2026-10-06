@@ -17,6 +17,9 @@ Instagram Story report generator (1080x1920) built from Last.fm listening data, 
 - ✅ **Intelligent Caching** - Caches Last.fm API responses, reuses on config changes
 - ✅ **Expanded Font Catalog** - 40+ grouped fonts (sans-serif, serif, mono, decorative) with live preview, auto-filtered to only fonts Typst can render on the machine
 - ✅ **Bundled Google Fonts** - Download a curated OFL font set into `fonts/` (CLI or one UI button) so servers/containers with few system fonts still get a rich catalog
+- ✅ **Two Fonts** - Separate primary and secondary (labels/captions) font selectors, both defaulting to the same family
+- ✅ **Export Actions** - Copy the rendered story to the clipboard or download it as PNG straight from the preview
+- ✅ **Remembered Credentials** - Optionally keep your Last.fm username + API key in the browser's `localStorage`
 - ✅ **Image Color Presets** - One-click background + accent extraction from the Top Artist, Top Album, or Top Track artwork (median-cut quantization), with WCAG contrast enforcement so accent text stays readable
 - ✅ **No Avatar** - Lightweight, clean design without user avatar
 
@@ -103,11 +106,13 @@ Note: the generated directory and the bundled `fonts/` directory are ignored by 
 
 The web UI provides real-time controls for:
 
-- **Last.fm Credentials** - Optional username + API key fields (with a **🔍 Sprawdź i pobierz** button that validates them against the Last.fm API). Leave empty to use `LASTFM_USERNAME` / `LASTFM_API_KEY` from `.env`. Get a key at [last.fm/api/account/create](https://www.last.fm/api/account/create).
-- **Font** - Choose from bundled Google Fonts + system fonts. Only fonts Typst can actually render are offered; use **⬇️ Pobierz czcionki Google** to download the bundled catalog on servers with few system fonts.
+- **Last.fm Credentials** - Optional username + API key fields (with a **🔍 Check & Generate** button that validates them against the Last.fm API). Leave empty to use `LASTFM_USERNAME` / `LASTFM_API_KEY` from `.env`. Get a key at [last.fm/api/account/create](https://www.last.fm/api/account/create). With **Remember in this browser** checked they are stored in `localStorage` so you don't have to retype them.
+- **Primary Font** - Base font for the report (bundled Google Fonts + system fonts, only fonts Typst can render are offered)
+- **Secondary Font** - Optional second font for labels, captions and supporting text. Tick **different from primary** to use a different family; otherwise it follows the primary font.
+- **⬇️ Download Google Fonts** - Download the bundled font catalog on servers with few system fonts
 - **Background Color** - Custom hex color for page background
 - **Accent Color** - Custom hex color for highlights and text
-- **Date Range** - Override the default previous month (ISO format: YYYY-MM-DD)
+- **Custom date range** - Off by default (report covers the previous full calendar month). Tick it to reveal the `Date From` / `Date To` inputs (ISO format: YYYY-MM-DD)
 - **Text Color Mode** - Auto (based on background luminance), Light (white), or Dark (black)
 - **Mosaic Artist Count** - 2, 4, 6, 8, or 10 artists in the top artists grid
 - **Module Toggles**:
@@ -116,23 +121,32 @@ The web UI provides real-time controls for:
   - Top Items (top artist, album, track)
   - Word Cloud (top tags)
 - **Footer Text** - Custom footer or leave empty to hide
+- **Preview actions** - **📋 Copy** copies the rendered PNG to the clipboard and **⬇️ Download** downloads it. Both are enabled once the image is generated (clipboard copy needs HTTPS or localhost).
 
 ### Change font
 Use the web UI font dropdown, or edit [config.js](config.js) to change the default font family:
 
 ```javascript
 typography: {
-  font: 'Segoe UI',        // any family name (see below)
+  font: 'Segoe UI',        // primary font — any family name (see below)
+  fontSecondary: '',       // optional secondary font; empty = same as primary
   monoFont: 'Courier New', // Fallback monospace font
   ...
 }
 ```
 
+The **primary** font is used for the base text (big numbers, top item names, word
+cloud), while the **secondary** font is applied to labels and captions (header,
+`scrobbles` label, `N artists/albums/tracks`, `Top artist/album/track` labels,
+playcount sublines, `Top tags` and the footer). When `fontSecondary` is empty
+both are the same, reproducing the classic single-font report.
+
 #### Bundled Google Fonts
 Typst renders the report server-side, so it can only use fonts that exist on the
 machine. On a minimal server/container that often means only a couple of system
 fonts are available. To fix this, Story.report can bundle a curated set of
-[Google Fonts](https://fonts.google.com/) (all OFL-licensed) into a local
+[Google Fonts](https://fonts.google.com/) (all OFL-licensed) — plus the
+**Font Awesome Free** desktop fonts used for the report icons — into a local
 `fonts/` directory and pass it to Typst via `--font-path`:
 
 ```bash
@@ -141,7 +155,7 @@ npm run fonts -- --force # re-download everything
 ```
 
 You can also trigger the download from the web UI with the
-**⬇️ Pobierz czcionki Google** button (next to the font selector); the catalog
+**⬇️ Download Google Fonts** button (next to the font selector); the catalog
 refreshes automatically afterwards. In Docker the fonts are downloaded during
 the image build, so nothing extra is needed at runtime.
 

@@ -124,7 +124,8 @@ typst compile template.typ.example out.png
 - `LASTFM_USERNAME` - Last.fm username (required)
 
 ### Report Overrides (used by web UI)
-- `REPORT_FONT` - Font family (e.g., 'Segoe UI', 'mono', 'serif')
+- `REPORT_FONT` - Primary font family (e.g., 'Segoe UI', 'mono', 'serif')
+- `REPORT_FONT_SECONDARY` - Secondary font for labels/captions (falls back to the primary when empty)
 - `REPORT_BG` - Background color hex (e.g., '#0f0f0f')
 - `REPORT_ACCENT` - Accent color hex (e.g., '#e8d5a3')
 - `REPORT_FOOTER_TEXT` - Custom footer text
@@ -146,7 +147,8 @@ Last.fm `user.getInfo` method before generating a report.
 ### Fonts
 Typst renders the report server-side, so it can only use fonts present on the
 machine. `scripts/fetch-fonts.js` downloads a curated set of OFL Google Fonts
-into `fonts/` (git-ignored). `index.js` passes that directory to
+plus the Font Awesome Free desktop fonts (needed by the Typst `fontawesome`
+package for the report icons) into `fonts/` (git-ignored). `index.js` passes that directory to
 `typst compile --font-path`, and `web/pages/api/fonts.js` passes it to
 `typst fonts` so the UI only offers renderable families. The user can trigger a
 download from the UI (`⬇️ Pobierz czcionki Google` → `/api/fetch-fonts`) or via

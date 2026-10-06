@@ -33,6 +33,7 @@ export const config = {
     // Mono:       Consolas, Courier New, Lucida Console, Cascadia Mono
     // Decorative: Segoe Print, Comic Sans MS, Ink Free
     font: 'Segoe UI',          // Change to 'Courier New', 'IBM Plex Mono', 'JetBrains Mono', etc. for monospace
+    fontSecondary: '',       // Optional secondary font for labels/captions. Empty = use the primary font.
     monoFont: 'Consolas',   // Monospace alternative that is usually available on Windows
     title: {
       size: '48pt',

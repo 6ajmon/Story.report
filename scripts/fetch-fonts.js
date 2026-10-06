@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
- * Downloads a curated set of Google Fonts (TTF/OTF) into ./fonts so Typst can
- * render them on any machine — including minimal servers / containers that have
- * only a couple of system fonts installed.
+ * Downloads a curated set of Google Fonts (TTF/OTF) plus the Font Awesome Free
+ * desktop fonts into ./fonts so Typst can render them on any machine — including
+ * minimal servers / containers that have only a couple of system fonts installed.
  *
- * The fonts live in the public `google/fonts` repository and are licensed under
- * the SIL Open Font License (OFL), so they are safe to bundle.
+ * Sources:
+ *   - Google Fonts (public `google/fonts` repo, SIL Open Font License)
+ *   - Font Awesome Free (public `FortAwesome/Font-Awesome` repo, OFL + CC BY 4.0),
+ *     required by the Typst `fontawesome` package used for the report icons.
  *
  * Usage:
  *   node scripts/fetch-fonts.js            # download missing fonts (idempotent)
@@ -60,6 +62,15 @@ const FONT_FILES = [
   'ofl/anton/Anton-Regular.ttf',
 ];
 
+// Font Awesome Free desktop OTFs — required by the Typst `fontawesome` package
+// used for the report's stats icons (star / disc / note).
+const FONT_AWESOME_BASE = 'https://raw.githubusercontent.com/FortAwesome/Font-Awesome/7.x/otfs/';
+const FONT_AWESOME_FILES = [
+  'Font Awesome 7 Free-Solid-900.otf',
+  'Font Awesome 7 Free-Regular-400.otf',
+  'Font Awesome 7 Brands-Regular-400.otf',
+];
+
 // raw.githubusercontent.com needs brackets/commas percent-encoded.
 function toUrl(relPath) {
   const encoded = relPath
@@ -69,22 +80,37 @@ function toUrl(relPath) {
   return RAW_BASE + encoded;
 }
 
-// Never include brackets/commas in on-disk names (Typst reads any name, but
-// this keeps the directory portable across shells/filesystems).
-function toFileName(relPath) {
-  const base = path.basename(relPath);
-  return base.replace(/[[\],]/g, '-').replace(/-+/g, '-');
+// Never include brackets/commas/spaces in on-disk names (Typst reads any name,
+// but this keeps the directory portable across shells/filesystems).
+function toFileName(fileName) {
+  return path
+    .basename(fileName)
+    .replace(/[[\],]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
 }
 
-async function downloadOne(relPath) {
-  const name = toFileName(relPath);
+// Build the download queue: Google Fonts (relative to `google/fonts`) plus the
+// Font Awesome desktop OTFs (absolute URLs).
+function buildTasks() {
+  const tasks = FONT_FILES.map((relPath) => ({
+    url: toUrl(relPath),
+    name: toFileName(relPath),
+  }));
+  for (const file of FONT_AWESOME_FILES) {
+    tasks.push({ url: FONT_AWESOME_BASE + encodeURIComponent(file), name: toFileName(file) });
+  }
+  return tasks;
+}
+
+async function downloadOne({ url, name }) {
   const dest = path.join(DEST_DIR, name);
 
   if (!FORCE && fs.existsSync(dest) && fs.statSync(dest).size > 0) {
     return { name, status: 'skipped' };
   }
 
-  const res = await fetch(toUrl(relPath), { signal: AbortSignal.timeout(30000) });
+  const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} ${res.statusText}`);
   }
@@ -99,32 +125,33 @@ async function downloadOne(relPath) {
 async function main() {
   fs.mkdirSync(DEST_DIR, { recursive: true });
 
-  console.log(`\n🔤 Story.report — fetching Google Fonts`);
+  console.log(`\n🔤 Story.report — fetching fonts (Google Fonts + Font Awesome)`);
   console.log(`   destination: ${DEST_DIR}`);
   console.log(`   mode:        ${FORCE ? 'force (re-download)' : 'incremental'}\n`);
 
+  const tasks = buildTasks();
   const results = [];
   const failures = [];
 
   // Simple worker pool so we don't hammer the network.
   let index = 0;
   async function worker() {
-    while (index < FONT_FILES.length) {
-      const relPath = FONT_FILES[index++];
+    while (index < tasks.length) {
+      const task = tasks[index++];
       try {
-        results.push(await downloadOne(relPath));
+        results.push(await downloadOne(task));
       } catch (error) {
-        failures.push({ relPath, error: error.message });
+        failures.push({ task, error: error.message });
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, FONT_FILES.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, worker));
 
   const downloaded = results.filter((r) => r.status === 'downloaded').length;
   const skipped = results.filter((r) => r.status === 'skipped').length;
 
   for (const f of failures) {
-    console.warn(`   ⚠️  ${toFileName(f.relPath)} — ${f.error}`);
+    console.warn(`   ⚠️  ${f.task.name} — ${f.error}`);
   }
 
   console.log(
@@ -134,7 +161,7 @@ async function main() {
   console.log(`   Typst will pick them up via --font-path "${DEST_DIR}".\n`);
 
   // Non-zero exit only if nothing could be prepared at all.
-  if (failures.length === FONT_FILES.length) {
+  if (failures.length === tasks.length) {
     process.exit(1);
   }
 }

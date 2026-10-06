@@ -28,6 +28,7 @@ const FORCE_FETCH = process.argv.includes('--force');
 // Environment overrides (used by the UI server)
 const REPORT_OVERRIDES = {
   font: process.env.REPORT_FONT || null,
+  fontSecondary: process.env.REPORT_FONT_SECONDARY || null,
   bg: process.env.REPORT_BG || null,
   accent: process.env.REPORT_ACCENT || null,
   footerText: process.env.REPORT_FOOTER_TEXT || null,
@@ -694,7 +695,12 @@ function generateTypstTemplate(data) {
   // Use config for margins, fonts, icons and colors
   const { page, typography, icons } = config;
   let { colors } = config;
-  const font = resolveTypstFontSpec(typography.font, typography.monoFont);
+  // Primary font drives the base text; the secondary font is used for labels,
+  // captions and other supporting text. Both default to the same family.
+  const primaryFontValue = REPORT_OVERRIDES.font || typography.font;
+  const secondaryFontValue = REPORT_OVERRIDES.fontSecondary || typography.fontSecondary || primaryFontValue;
+  const font = resolveTypstFontSpec(primaryFontValue, typography.monoFont);
+  const secondaryFont = resolveTypstFontSpec(secondaryFontValue, typography.monoFont);
 
   // Calculate adaptive text color based on background luminance
   const bgColorHex = REPORT_OVERRIDES.bg || config.colors.background || '#0f0f0f';
@@ -757,10 +763,11 @@ function generateTypstTemplate(data) {
   fill: rgb("${colors.background}"),
 )
 #set text(font: ${font}, fill: rgb("${colors.text}"))
+#let font-secondary = ${secondaryFont}
 
 // Header: Username and date range
 #align(right)[
-  #text(size: 32pt, fill: rgb("${colors.textMuted}"))[
+  #text(size: 32pt, fill: rgb("${colors.textMuted}"), font: font-secondary)[
     ${dateRange},
     #linebreak()
     ${username}
@@ -773,7 +780,7 @@ function generateTypstTemplate(data) {
 #text(size: 108pt, weight: "bold")[
   ${monthlyScrobbles} 
   #h(-20pt) 
-  #text(size: 42pt, weight: "regular", fill: rgb("${colors.textMuted}"))[scrobbles]
+  #text(size: 42pt, weight: "regular", fill: rgb("${colors.textMuted}"), font: font-secondary)[scrobbles]
 ]
 
 #v(-80pt)
@@ -794,19 +801,19 @@ ${REPORT_OVERRIDES.enableStatistics ? `
   [
     #text(size: 32pt, weight: "bold", fill: rgb("${colors.secondary}"))[#fa-star(solid: true)]
     #v(0pt)
-    #text(size: 32pt, fill: rgb("${colors.secondary}"))[${uniqueArtists} artists]
+    #text(size: 32pt, fill: rgb("${colors.secondary}"), font: font-secondary)[${uniqueArtists} artists]
   ],
 
   [
     #text(size: 32pt, weight: "bold", fill: rgb("${colors.secondary}"))[#fa-compact-disc()]
     #v(0pt)
-    #text(size: 32pt, fill: rgb("${colors.secondary}"))[${uniqueAlbums} albums]
+    #text(size: 32pt, fill: rgb("${colors.secondary}"), font: font-secondary)[${uniqueAlbums} albums]
   ],
 
   [
     #text(size: 32pt, weight: "bold", fill: rgb("${colors.secondary}"))[#fa-music()]
     #v(0pt)
-    #text(size: 32pt, fill: rgb("${colors.secondary}"))[${uniqueTracks} tracks]
+    #text(size: 32pt, fill: rgb("${colors.secondary}"), font: font-secondary)[${uniqueTracks} tracks]
   ],
 )
 
@@ -835,29 +842,29 @@ ${REPORT_OVERRIDES.enableTopItems ? `
   align: (left + horizon, left + horizon, center + horizon),
 
   // Top artist
-  text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top artist],
+  text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"), font: font-secondary)[Top artist],
   [
     #text(size: 36pt, weight: "bold")[${topArtist.name}]
     #v(0pt)
-    #text(size: 29pt, fill: rgb("${colors.secondary}"))[${topArtist.playcount} scrobbles]
+    #text(size: 29pt, fill: rgb("${colors.secondary}"), font: font-secondary)[${topArtist.playcount} scrobbles]
   ],
   ${artistImageElement}
 
   // Top album
-  text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top album],
+  text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"), font: font-secondary)[Top album],
   [
     #text(size: 36pt, weight: "bold")[${topAlbum.name}]
     #v(0pt)
-    #text(size: 29pt, fill: rgb("${colors.secondary}"))[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
+    #text(size: 29pt, fill: rgb("${colors.secondary}"), font: font-secondary)[${topAlbum.artist} · ${topAlbum.playcount} scrobbles]
   ],
   ${albumImageElement}
 
   // Top track
-  text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[Top track],
+  text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"), font: font-secondary)[Top track],
   [
     #text(size: 36pt, weight: "bold")[${topTrack.name}]
     #v(0pt)
-    #text(size: 29pt, fill: rgb("${colors.secondary}"))[${topTrack.artist} · ${topTrack.playcount} scrobbles]
+    #text(size: 29pt, fill: rgb("${colors.secondary}"), font: font-secondary)[${topTrack.artist} · ${topTrack.playcount} scrobbles]
   ],
   ${trackImageElement}
 )
@@ -867,7 +874,7 @@ ${REPORT_OVERRIDES.enableTopItems ? `
 
 // Top tags (word cloud)
 ${REPORT_OVERRIDES.enableWordCloud ? `
-#text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"))[
+#text(size: 28pt, weight: "bold", fill: rgb("${colors.textMuted}"), font: font-secondary)[
   Top tags
 ]
 
@@ -880,7 +887,7 @@ ${tagCloud}
 
 // Footer
 ${footerTextSafe ? `#align(center)[
-  #text(size: 20pt, fill: rgb("${colors.textMuted}"))[ 
+  #text(size: 20pt, fill: rgb("${colors.textMuted}"), font: font-secondary)[ 
     ${footerTextSafe}
   ]
 ]` : ''}
