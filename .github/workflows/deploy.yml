@@ -6,7 +6,7 @@ name: Deploy na serwer
 # Wymagane sekrety w repo (Settings -> Secrets and variables -> Actions):
 #   TS_OAUTH_CLIENT_ID / TS_OAUTH_SECRET  - klient OAuth Tailscale z tagiem tag:ci
 #   DEPLOY_HOST                            - adres serwera w tailnecie (adres-w-tailnecie)
-#   DEPLOY_USER                            - root
+#   DEPLOY_USER                            - deploy
 #   DEPLOY_SSH_KEY                         - klucz prywatny klucz-ssh-z-sekretu
 on:
   push:
@@ -39,4 +39,4 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 \
-              "$DEPLOY_USER@$DEPLOY_HOST" /srv/story-report/deploy.sh
+              "$DEPLOY_USER@$DEPLOY_HOST" "sudo -n /srv/story-report/deploy.sh"
