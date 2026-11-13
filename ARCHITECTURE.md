@@ -144,6 +144,13 @@ typst compile template.typ.example out.png
 The web UI's `/api/validate` endpoint checks username + API key pairs via the
 Last.fm `user.getInfo` method before generating a report.
 
+`/api/generate` spawns `index.js`, which always writes the same
+`generated/report.png`. Because the UI regenerates on every settings change, runs
+are serialized inside the API route (and only the most recent queued request is
+kept) so an older, slower run cannot overwrite a newer render. The UI also
+ignores responses from superseded requests, and the Download/Copy buttons fetch
+the PNG with `cache: no-store` so the file always matches the preview.
+
 ### Fonts
 Typst renders the report server-side, so it can only use fonts present on the
 machine. `scripts/fetch-fonts.js` downloads a curated set of OFL Google Fonts
