@@ -184,6 +184,9 @@ export default function Home() {
   const [imageVersion, setImageVersion] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const autoGenerateTimeoutRef = useRef(null);
+  // Monotonic id of the newest generate request; older responses are ignored so
+  // the preview never points at an outdated render.
+  const generateRequestRef = useRef(0);
 
   // Auto-generate on config changes (debounced)
   useEffect(() => {
@@ -343,6 +346,7 @@ export default function Home() {
   }
 
   async function generateReport(forceFetch = false) {
+    const requestId = ++generateRequestRef.current;
     setStatus(forceFetch ? '⏳ Force fetching...' : '⏳ Generating...');
     setImageUrl(null);
     setIsLoading(true);
@@ -372,6 +376,7 @@ export default function Home() {
         }),
       });
       const data = await resp.json();
+      if (requestId !== generateRequestRef.current) return; // superseded by a newer run
       if (data.ok) {
         setStatus('✅ Done!');
         const version = Date.now();
@@ -383,16 +388,19 @@ export default function Home() {
         setStatus('❌ Error: ' + (data.error || 'unknown'));
       }
     } catch (err) {
+      if (requestId !== generateRequestRef.current) return;
       setStatus('❌ Error: ' + err.message);
     } finally {
-      setIsLoading(false);
+      if (requestId === generateRequestRef.current) setIsLoading(false);
     }
   }
 
   // ---- Preview actions (copy / download) ----
 
   async function fetchReportBlob() {
-    const resp = await fetch(imageUrl);
+    // Bypass every HTTP cache layer: the preview <img> may still show an older
+    // render, and the downloaded file must match the latest generated PNG.
+    const resp = await fetch(`/api/report-image?ts=${Date.now()}`, { cache: 'no-store' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.blob();
   }

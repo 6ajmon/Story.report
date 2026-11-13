@@ -1,13 +1,13 @@
-name: Deploy na serwer
+name: Deploy
 
-# Auto-deploy: po pushu na main laczymy sie z tailnetem i uruchamiamy
-# /srv/story-report/deploy.sh na serwerze serwer (Tailscale Serve).
+# Auto-deploy: po pushu na main laczymy sie z tailnetem (Tailscale) i uruchamiamy
+# skrypt deploy.sh na serwerze.
 #
 # Wymagane sekrety w repo (Settings -> Secrets and variables -> Actions):
 #   TS_OAUTH_CLIENT_ID / TS_OAUTH_SECRET  - klient OAuth Tailscale z tagiem tag:ci
-#   DEPLOY_HOST                            - adres serwera w tailnecie (adres-w-tailnecie)
-#   DEPLOY_USER                            - deploy
-#   DEPLOY_SSH_KEY                         - klucz prywatny klucz-ssh-z-sekretu
+#   DEPLOY_HOST                            - adres serwera w tailnecie
+#   DEPLOY_USER                            - uzytkownik SSH do wdrozen
+#   DEPLOY_SSH_KEY                         - klucz prywatny SSH (zawartosc pliku)
 on:
   push:
     branches: [main]
